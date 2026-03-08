@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
 import { useCustomers } from "@/hooks/useCustomers";
 import { CustomerAddress } from "@/data/customer";
+import { createOrderFromCheckout, saveOrder } from "@/data/orders";
 import { referenceSuggestions } from "@/data/deliveryZones";
 import Header from "@/components/Header";
 import { toast } from "sonner";
@@ -132,6 +133,12 @@ const Checkout = () => {
     // Save customer
     const digits = phone.replace(/\D/g, "");
     createOrUpdate(digits, name);
+
+    // Save order to localStorage
+    const order = createOrderFromCheckout(
+      name, digits, finalAddress as any, items, total, deliveryFee, grandTotal, payment
+    );
+    saveOrder(order);
 
     const itemsText = items
       .map((i) => `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}${i.notes ? `\n   _Obs: ${i.notes}_` : ""}`)
