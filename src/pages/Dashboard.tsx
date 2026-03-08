@@ -152,7 +152,20 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background pb-10">
       <Header />
       <div className="container py-4">
-        <h1 className="font-display text-xl font-bold text-foreground mb-4">Dashboard</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="font-display text-xl font-bold text-foreground">Dashboard</h1>
+          <button
+            onClick={() => {
+              setSoundEnabled((prev) => !prev);
+              if (!soundEnabled) playNotificationSound();
+              toast.success(soundEnabled ? "🔇 Notificação sonora desativada" : "🔔 Notificação sonora ativada");
+            }}
+            className={`p-2 rounded-lg border transition-colors ${soundEnabled ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"}`}
+            title={soundEnabled ? "Desativar som" : "Ativar som"}
+          >
+            {soundEnabled ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}
+          </button>
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-4 scrollbar-hide">
