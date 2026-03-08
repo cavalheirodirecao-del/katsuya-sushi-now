@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useProducts } from "@/hooks/useProducts";
-import { useNeighborhoods } from "@/hooks/useNeighborhoods";
+import { useDeliveryZones } from "@/hooks/useDeliveryZones";
 import { categories } from "@/data/products";
 import Header from "@/components/Header";
 import { Switch } from "@/components/ui/switch";
@@ -11,15 +11,16 @@ const ADMIN_PASS = "katsuya2024";
 
 const Admin = () => {
   const { products, updateProduct } = useProducts();
-  const { neighborhoods, updateNeighborhood, addNeighborhood } = useNeighborhoods();
+  const { zones, updateZone, addZone } = useDeliveryZones();
   const [auth, setAuth] = useState(false);
   const [pass, setPass] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState("");
-  const [tab, setTab] = useState<"products" | "neighborhoods">("products");
+  const [tab, setTab] = useState<"products" | "zones">("products");
 
-  // New neighborhood form
-  const [newName, setNewName] = useState("");
+  // New zone form
+  const [newNeighborhood, setNewNeighborhood] = useState("");
+  const [newReference, setNewReference] = useState("");
   const [newFee, setNewFee] = useState("");
 
   if (!auth) {
@@ -60,6 +61,13 @@ const Admin = () => {
   const inputClass =
     "w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50";
 
+  // Group zones by neighborhood
+  const zonesByNeighborhood = zones.reduce((acc, z) => {
+    if (!acc[z.neighborhood]) acc[z.neighborhood] = [];
+    acc[z.neighborhood].push(z);
+    return acc;
+  }, {} as Record<string, typeof zones>);
+
   return (
     <div className="min-h-screen bg-background pb-10">
       <Header />
@@ -77,12 +85,12 @@ const Admin = () => {
             🍣 Produtos
           </button>
           <button
-            onClick={() => setTab("neighborhoods")}
+            onClick={() => setTab("zones")}
             className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              tab === "neighborhoods" ? "gradient-red text-primary-foreground" : "bg-secondary text-secondary-foreground"
+              tab === "zones" ? "gradient-red text-primary-foreground" : "bg-secondary text-secondary-foreground"
             }`}
           >
-            🛵 Bairros / Frete
+            🛵 Zonas de Entrega
           </button>
         </div>
 
@@ -144,45 +152,33 @@ const Admin = () => {
           </>
         )}
 
-        {tab === "neighborhoods" && (
+        {tab === "zones" && (
           <div className="space-y-4">
-            <h2 className="text-sm font-bold text-primary flex items-center gap-2">
-              <MapPin className="h-4 w-4" /> Gerenciar Bairros
-            </h2>
-
-            {/* Add new */}
+            {/* Add new zone */}
             <div className="bg-card border border-border rounded-lg p-4 space-y-3">
-              <p className="text-sm font-bold text-foreground">Adicionar Bairro</p>
-              <div className="flex gap-2">
-                <input
-                  className={inputClass}
-                  placeholder="Nome do bairro"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                />
-                <input
-                  className="w-24 bg-secondary border border-border rounded-lg px-3 py-2 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-                  placeholder="Taxa"
-                  type="number"
-                  value={newFee}
-                  onChange={(e) => setNewFee(e.target.value)}
-                />
-              </div>
+              <p className="text-sm font-bold text-foreground flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-primary" /> Adicionar Zona de Entrega
+              </p>
+              <input className={inputClass} placeholder="Bairro" value={newNeighborhood} onChange={(e) => setNewNeighborhood(e.target.value)} />
+              <input className={inputClass} placeholder="Ponto de referência" value={newReference} onChange={(e) => setNewReference(e.target.value)} />
+              <input className={inputClass} placeholder="Taxa (R$)" type="number" value={newFee} onChange={(e) => setNewFee(e.target.value)} />
               <button
                 onClick={() => {
-                  if (!newName || !newFee) {
-                    toast.error("Preencha nome e taxa!");
+                  if (!newNeighborhood || !newReference || !newFee) {
+                    toast.error("Preencha todos os campos!");
                     return;
                   }
-                  addNeighborhood({
-                    id: `bairro-${Date.now()}`,
-                    name: newName,
+                  addZone({
+                    id: `zona-${Date.now()}`,
+                    neighborhood: newNeighborhood,
+                    reference: newReference,
                     fee: parseFloat(newFee),
                     active: true,
                   });
-                  setNewName("");
+                  setNewNeighborhood("");
+                  setNewReference("");
                   setNewFee("");
-                  toast.success("Bairro adicionado!");
+                  toast.success("Zona adicionada!");
                 }}
                 className="gradient-red text-primary-foreground rounded-lg py-2 px-4 text-sm font-medium flex items-center gap-1"
               >
@@ -190,50 +186,50 @@ const Admin = () => {
               </button>
             </div>
 
-            {/* List */}
-            <div className="space-y-2">
-              {neighborhoods.map((n) => (
-                <div key={n.id} className="bg-card border border-border rounded-lg p-3 flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{n.name}</p>
-                    {editingId === n.id ? (
-                      <input
-                        type="number"
-                        className="mt-1 w-24 bg-secondary border border-border rounded px-2 py-1 text-sm text-foreground"
-                        value={editPrice}
-                        onChange={(e) => setEditPrice(e.target.value)}
-                        onBlur={() => {
-                          updateNeighborhood(n.id, { fee: parseFloat(editPrice) || n.fee });
-                          setEditingId(null);
-                          toast.success("Taxa atualizada!");
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                        }}
-                        autoFocus
-                      />
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setEditingId(n.id);
-                          setEditPrice(String(n.fee));
-                        }}
-                        className="text-xs text-primary hover:underline"
-                      >
-                        R$ {n.fee.toFixed(2)}
-                      </button>
-                    )}
+            {/* Zones list grouped by neighborhood */}
+            {Object.entries(zonesByNeighborhood).map(([neighborhood, nZones]) => (
+              <div key={neighborhood} className="space-y-2">
+                <h3 className="text-sm font-bold text-primary">{neighborhood}</h3>
+                {nZones.map((z) => (
+                  <div key={z.id} className="bg-card border border-border rounded-lg p-3 flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground truncate">{z.reference}</p>
+                      {editingId === z.id ? (
+                        <input
+                          type="number"
+                          className="mt-1 w-20 bg-secondary border border-border rounded px-2 py-1 text-sm text-foreground"
+                          value={editPrice}
+                          onChange={(e) => setEditPrice(e.target.value)}
+                          onBlur={() => {
+                            updateZone(z.id, { fee: parseFloat(editPrice) || z.fee });
+                            setEditingId(null);
+                            toast.success("Taxa atualizada!");
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                          }}
+                          autoFocus
+                        />
+                      ) : (
+                        <button
+                          onClick={() => { setEditingId(z.id); setEditPrice(String(z.fee)); }}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          R$ {z.fee.toFixed(2)}
+                        </button>
+                      )}
+                    </div>
+                    <Switch
+                      checked={z.active}
+                      onCheckedChange={(checked) => {
+                        updateZone(z.id, { active: checked });
+                        toast.success(checked ? "Zona ativada" : "Zona desativada");
+                      }}
+                    />
                   </div>
-                  <Switch
-                    checked={n.active}
-                    onCheckedChange={(checked) => {
-                      updateNeighborhood(n.id, { active: checked });
-                      toast.success(checked ? "Bairro ativado" : "Bairro desativado");
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ))}
           </div>
         )}
       </div>
