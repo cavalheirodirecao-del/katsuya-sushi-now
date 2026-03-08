@@ -1,27 +1,53 @@
 import { useState, useEffect } from "react";
-import { DeliveryZone, defaultDeliveryZones } from "@/data/deliveryZones";
+import {
+  DeliveryZone,
+  defaultDeliveryZones,
+  deliveryOrigin,
+  haversineDistance,
+  MAX_DELIVERY_DISTANCE_KM,
+} from "@/data/deliveryZones";
 
 const STORAGE_KEY = "katsuya-delivery-zones";
 
 export const useDeliveryZones = () => {
   const [zones, setZones] = useState<DeliveryZone[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : defaultDeliveryZones;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Migration: if old format (has neighborhood field), reset to new defaults
+        if (parsed.length > 0 && "neighborhood" in parsed[0]) {
+          return defaultDeliveryZones;
+        }
+        return parsed;
+      } catch {
+        return defaultDeliveryZones;
+      }
+    }
+    return defaultDeliveryZones;
   });
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(zones));
   }, [zones]);
 
-  const activeZones = zones.filter((z) => z.active);
+  const activeZones = zones.filter((z) => z.active).sort((a, b) => a.maxDistanceKm - b.maxDistanceKm);
 
-  const neighborhoods = [...new Set(activeZones.map((z) => z.neighborhood))].sort();
+  /**
+   * Given customer coordinates, find the matching zone and fee.
+   * Returns { zone, fee, distanceKm } or null if out of range.
+   */
+  const calculateFee = (customerLat: number, customerLng: number) => {
+    const dist = haversineDistance(deliveryOrigin.lat, deliveryOrigin.lng, customerLat, customerLng);
+    if (dist > MAX_DELIVERY_DISTANCE_KM) return null;
 
-  const getReferencesForNeighborhood = (neighborhood: string) =>
-    activeZones.filter((z) => z.neighborhood === neighborhood);
-
-  const findZone = (neighborhood: string, reference: string) =>
-    activeZones.find((z) => z.neighborhood === neighborhood && z.reference === reference);
+    for (const z of activeZones) {
+      if (dist <= z.maxDistanceKm) {
+        return { zone: z, fee: z.fee, distanceKm: Math.round(dist * 10) / 10 };
+      }
+    }
+    return null;
+  };
 
   const updateZone = (id: string, updates: Partial<DeliveryZone>) => {
     setZones((prev) => prev.map((z) => (z.id === id ? { ...z, ...updates } : z)));
@@ -31,5 +57,9 @@ export const useDeliveryZones = () => {
     setZones((prev) => [...prev, zone]);
   };
 
-  return { zones, activeZones, neighborhoods, getReferencesForNeighborhood, findZone, updateZone, addZone };
+  const removeZone = (id: string) => {
+    setZones((prev) => prev.filter((z) => z.id !== id));
+  };
+
+  return { zones, activeZones, calculateFee, updateZone, addZone, removeZone, origin: deliveryOrigin };
 };

@@ -1,31 +1,77 @@
+export interface DeliveryOrigin {
+  name: string;
+  address: string;
+  district: string;
+  city: string;
+  state: string;
+  lat: number;
+  lng: number;
+}
+
 export interface DeliveryZone {
   id: string;
-  neighborhood: string;
-  reference: string;
+  zone: string;
+  maxDistanceKm: number;
   fee: number;
+  description: string;
   active: boolean;
 }
 
+export const deliveryOrigin: DeliveryOrigin = {
+  name: "Cavalheiro Delivery",
+  address: "Rua Carlos Laet, 254 A",
+  district: "Indianópolis",
+  city: "Caruaru",
+  state: "PE",
+  lat: -8.2837,
+  lng: -35.9725,
+};
+
 export const defaultDeliveryZones: DeliveryZone[] = [
-  // Centro
-  { id: "zona-1", neighborhood: "Centro", reference: "Próximo ao hospital", fee: 5, active: true },
-  { id: "zona-2", neighborhood: "Centro", reference: "Próximo ao shopping", fee: 7, active: true },
-  { id: "zona-3", neighborhood: "Centro", reference: "Próximo ao fórum", fee: 6, active: true },
-  // Indianópolis
-  { id: "zona-4", neighborhood: "Indianópolis", reference: "Hospital Unimed", fee: 6, active: true },
-  { id: "zona-5", neighborhood: "Indianópolis", reference: "Posto de gasolina", fee: 6, active: true },
-  // Maurício de Nassau
-  { id: "zona-6", neighborhood: "Maurício de Nassau", reference: "Supermercado", fee: 7, active: true },
-  { id: "zona-7", neighborhood: "Maurício de Nassau", reference: "Escola", fee: 7, active: true },
-  // Vassoural
-  { id: "zona-8", neighborhood: "Vassoural", reference: "Farmácia", fee: 7, active: true },
-  // Universitário
-  { id: "zona-9", neighborhood: "Universitário", reference: "Faculdade", fee: 8, active: true },
-  // São João da Escócia
-  { id: "zona-10", neighborhood: "São João da Escócia", reference: "Cartório", fee: 8, active: true },
-  // Cidade Jardim
-  { id: "zona-11", neighborhood: "Cidade Jardim", reference: "Praça principal", fee: 9, active: true },
+  {
+    id: "zona-1",
+    zone: "Indianópolis",
+    maxDistanceKm: 1,
+    fee: 8,
+    description: "Entrega dentro do bairro Indianópolis",
+    active: true,
+  },
+  {
+    id: "zona-2",
+    zone: "Área 1",
+    maxDistanceKm: 2,
+    fee: 10,
+    description: "Santa Rosa, São Francisco, Petrópolis, Maurício de Nassau, Vassoural",
+    active: true,
+  },
+  {
+    id: "zona-3",
+    zone: "Área 2",
+    maxDistanceKm: 5,
+    fee: 13,
+    description: "Kennedy, João Mota, Divinópolis, Centenário, Universitário, Salgado",
+    active: true,
+  },
 ];
+
+export const MAX_DELIVERY_DISTANCE_KM = 5;
+export const OUT_OF_RANGE_MESSAGE = "Desculpe, ainda não entregamos nessa região.";
+
+// Haversine formula — straight-line distance in km
+export function haversineDistance(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 export const referenceSuggestions = [
   "Hospital",
