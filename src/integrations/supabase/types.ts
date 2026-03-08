@@ -14,6 +14,153 @@ export type Database = {
   }
   public: {
     Tables: {
+      order_items: {
+        Row: {
+          created_at: string
+          flavor: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          price: number
+          product_id: string | null
+          product_name: string
+          quantity: number
+        }
+        Insert: {
+          created_at?: string
+          flavor?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          price: number
+          product_id?: string | null
+          product_name: string
+          quantity?: number
+        }
+        Update: {
+          created_at?: string
+          flavor?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          price?: number
+          product_id?: string | null
+          product_name?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          address_neighborhood: string
+          address_number: string
+          address_reference: string | null
+          address_street: string
+          created_at: string
+          customer_name: string
+          customer_phone: string
+          delivery_fee: number
+          id: string
+          order_number: string
+          payment_method: string
+          status: string
+          subtotal: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          address_neighborhood: string
+          address_number: string
+          address_reference?: string | null
+          address_street: string
+          created_at?: string
+          customer_name: string
+          customer_phone: string
+          delivery_fee?: number
+          id?: string
+          order_number: string
+          payment_method: string
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          address_neighborhood?: string
+          address_number?: string
+          address_reference?: string | null
+          address_street?: string
+          created_at?: string
+          customer_name?: string
+          customer_phone?: string
+          delivery_fee?: number
+          id?: string
+          order_number?: string
+          payment_method?: string
+          status?: string
+          subtotal?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          active: boolean
+          category: string
+          created_at: string
+          description: string | null
+          flavors: string[] | null
+          id: string
+          image_url: string | null
+          name: string
+          price: number
+          stock: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category: string
+          created_at?: string
+          description?: string | null
+          flavors?: string[] | null
+          id?: string
+          image_url?: string | null
+          name: string
+          price?: number
+          stock?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          created_at?: string
+          description?: string | null
+          flavors?: string[] | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          price?: number
+          stock?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
