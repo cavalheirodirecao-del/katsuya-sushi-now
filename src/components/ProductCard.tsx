@@ -1,0 +1,61 @@
+import { Plus } from "lucide-react";
+import { Product } from "@/data/products";
+import { useCart } from "@/contexts/CartContext";
+import { useState } from "react";
+import { toast } from "sonner";
+
+interface Props {
+  product: Product;
+}
+
+const ProductCard = ({ product }: Props) => {
+  const { addItem } = useCart();
+  const [selectedFlavor, setSelectedFlavor] = useState(product.flavors?.[0] || "");
+
+  const handleAdd = () => {
+    addItem(product, selectedFlavor || undefined);
+    toast.success(`${product.name} adicionado ao carrinho!`);
+  };
+
+  return (
+    <div className="bg-card rounded-lg border border-border p-4 flex flex-col gap-2 animate-fade-in">
+      <div className="flex justify-between items-start">
+        <div className="flex-1">
+          <h3 className="font-bold text-foreground text-base">{product.name}</h3>
+          <p className="text-muted-foreground text-sm mt-1">{product.description}</p>
+        </div>
+        <span className="text-primary font-bold text-lg whitespace-nowrap ml-3">
+          R$ {product.price.toFixed(2)}
+        </span>
+      </div>
+
+      {product.flavors && product.flavors.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-1">
+          {product.flavors.map((f) => (
+            <button
+              key={f}
+              onClick={() => setSelectedFlavor(f)}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                selectedFlavor === f
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:border-primary/50"
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <button
+        onClick={handleAdd}
+        className="mt-2 gradient-red text-primary-foreground rounded-lg py-2.5 flex items-center justify-center gap-2 font-medium text-sm hover:opacity-90 transition-opacity active:scale-95"
+      >
+        <Plus className="h-4 w-4" />
+        Adicionar
+      </button>
+    </div>
+  );
+};
+
+export default ProductCard;
