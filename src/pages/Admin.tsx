@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useProducts } from "@/hooks/useProducts";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
 import { categories } from "@/data/products";
 import Header from "@/components/Header";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Lock, MapPin, Plus, Trash2 } from "lucide-react";
+import { Lock, MapPin, Plus, Trash2, BarChart3 } from "lucide-react";
 
 const ADMIN_PASS = "katsuya2024";
 
@@ -87,6 +88,14 @@ const Admin = () => {
             🛵 Zonas de Entrega
           </button>
         </div>
+
+        {/* Link to Dashboard */}
+        <Link
+          to="/dashboard"
+          className="flex items-center justify-center gap-2 mb-6 bg-card border border-border rounded-lg py-3 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+        >
+          <BarChart3 className="h-4 w-4" /> Abrir Dashboard de Vendas
+        </Link>
 
         {tab === "products" && (
           <>
