@@ -1,13 +1,47 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useOrders } from "@/hooks/useOrders";
-import { Order } from "@/data/orders";
+import { Order, loadOrders } from "@/data/orders";
 import Header from "@/components/Header";
 import { toast } from "sonner";
-import { Lock, TrendingUp, ShoppingBag, Users, MapPin, CreditCard, Download, BarChart3, Package, Crown } from "lucide-react";
+import { Lock, TrendingUp, ShoppingBag, Users, MapPin, CreditCard, Download, BarChart3, Package, Crown, Bell, BellOff } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { format, parseISO } from "date-fns";
 
 const ADMIN_PASS = "katsuya2024";
+
+// Generate notification sound using Web Audio API
+const playNotificationSound = () => {
+  try {
+    const ctx = new AudioContext();
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(880, ctx.currentTime);
+    osc1.frequency.setValueAtTime(1100, ctx.currentTime + 0.15);
+
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(660, ctx.currentTime + 0.3);
+    osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.45);
+
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.3);
+    osc2.start(ctx.currentTime + 0.3);
+    osc2.stop(ctx.currentTime + 0.6);
+
+    setTimeout(() => ctx.close(), 1000);
+  } catch {
+    // Audio not available
+  }
+};
 
 const statusLabels: Record<Order["status"], string> = {
   pendente: "⏳ Pendente",
