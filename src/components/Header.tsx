@@ -14,6 +14,9 @@ const Header = () => {
           <span className="font-display text-sm font-bold tracking-wide text-foreground">KATSUYA</span>
         </Link>
         <div className="flex items-center gap-3">
+          <Link to="/dashboard" className="p-2 text-muted-foreground hover:text-foreground transition-colors" title="Dashboard">
+            <LayoutDashboard className="h-5 w-5" />
+          </Link>
           <Link to="/cardapio" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Cardápio
           </Link>
