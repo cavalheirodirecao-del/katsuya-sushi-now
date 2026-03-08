@@ -60,6 +60,12 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     );
   };
 
+  const updateNotes = (productId: string, notes: string) => {
+    setItems((prev) =>
+      prev.map((i) => (i.product.id === productId ? { ...i, notes } : i))
+    );
+  };
+
   const clearCart = () => setItems([]);
 
   const total = items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
