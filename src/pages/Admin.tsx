@@ -89,6 +89,14 @@ const Admin = () => {
           </button>
         </div>
 
+        {/* Link to Dashboard */}
+        <Link
+          to="/dashboard"
+          className="flex items-center justify-center gap-2 mb-6 bg-card border border-border rounded-lg py-3 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+        >
+          <BarChart3 className="h-4 w-4" /> Abrir Dashboard de Vendas
+        </Link>
+
         {tab === "products" && (
           <>
             {categories.map((cat) => {
