@@ -57,7 +57,7 @@ const Checkout = () => {
     localStorage.setItem("katsuya-customer", JSON.stringify(customer));
 
     const itemsText = items
-      .map((i) => `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}`)
+      .map((i) => `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}${i.notes ? `\n   _Obs: ${i.notes}_` : ""}`)
       .join("\n");
 
     const paymentText =
