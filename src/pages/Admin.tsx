@@ -5,13 +5,13 @@ import { categories } from "@/data/products";
 import Header from "@/components/Header";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Lock, MapPin, Plus } from "lucide-react";
+import { Lock, MapPin, Plus, Trash2 } from "lucide-react";
 
 const ADMIN_PASS = "katsuya2024";
 
 const Admin = () => {
   const { products, updateProduct } = useProducts();
-  const { zones, updateZone, addZone } = useDeliveryZones();
+  const { zones, updateZone, addZone, removeZone, origin } = useDeliveryZones();
   const [auth, setAuth] = useState(false);
   const [pass, setPass] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -19,9 +19,10 @@ const Admin = () => {
   const [tab, setTab] = useState<"products" | "zones">("products");
 
   // New zone form
-  const [newNeighborhood, setNewNeighborhood] = useState("");
-  const [newReference, setNewReference] = useState("");
+  const [newZoneName, setNewZoneName] = useState("");
+  const [newMaxDist, setNewMaxDist] = useState("");
   const [newFee, setNewFee] = useState("");
+  const [newDesc, setNewDesc] = useState("");
 
   if (!auth) {
     return (
@@ -60,13 +61,6 @@ const Admin = () => {
 
   const inputClass =
     "w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50";
-
-  // Group zones by neighborhood
-  const zonesByNeighborhood = zones.reduce((acc, z) => {
-    if (!acc[z.neighborhood]) acc[z.neighborhood] = [];
-    acc[z.neighborhood].push(z);
-    return acc;
-  }, {} as Record<string, typeof zones>);
 
   return (
     <div className="min-h-screen bg-background pb-10">
@@ -154,30 +148,40 @@ const Admin = () => {
 
         {tab === "zones" && (
           <div className="space-y-4">
+            {/* Origin info */}
+            <div className="bg-card border border-border rounded-lg p-4">
+              <p className="text-sm font-bold text-foreground mb-1">📍 Ponto de origem</p>
+              <p className="text-xs text-muted-foreground">{origin.address}, {origin.district} — {origin.city}/{origin.state}</p>
+              <p className="text-xs text-muted-foreground">Lat: {origin.lat}, Lng: {origin.lng}</p>
+            </div>
+
             {/* Add new zone */}
             <div className="bg-card border border-border rounded-lg p-4 space-y-3">
               <p className="text-sm font-bold text-foreground flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-primary" /> Adicionar Zona de Entrega
+                <MapPin className="h-4 w-4 text-primary" /> Adicionar Zona
               </p>
-              <input className={inputClass} placeholder="Bairro" value={newNeighborhood} onChange={(e) => setNewNeighborhood(e.target.value)} />
-              <input className={inputClass} placeholder="Ponto de referência" value={newReference} onChange={(e) => setNewReference(e.target.value)} />
-              <input className={inputClass} placeholder="Taxa (R$)" type="number" value={newFee} onChange={(e) => setNewFee(e.target.value)} />
+              <input className={inputClass} placeholder="Nome da zona (ex: Área 3)" value={newZoneName} onChange={(e) => setNewZoneName(e.target.value)} />
+              <input className={inputClass} placeholder="Distância máxima (km)" type="number" step="0.5" value={newMaxDist} onChange={(e) => setNewMaxDist(e.target.value)} />
+              <input className={inputClass} placeholder="Taxa de entrega (R$)" type="number" value={newFee} onChange={(e) => setNewFee(e.target.value)} />
+              <input className={inputClass} placeholder="Descrição (bairros cobertos)" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
               <button
                 onClick={() => {
-                  if (!newNeighborhood || !newReference || !newFee) {
-                    toast.error("Preencha todos os campos!");
+                  if (!newZoneName || !newMaxDist || !newFee) {
+                    toast.error("Preencha nome, distância e taxa!");
                     return;
                   }
                   addZone({
                     id: `zona-${Date.now()}`,
-                    neighborhood: newNeighborhood,
-                    reference: newReference,
+                    zone: newZoneName,
+                    maxDistanceKm: parseFloat(newMaxDist),
                     fee: parseFloat(newFee),
+                    description: newDesc,
                     active: true,
                   });
-                  setNewNeighborhood("");
-                  setNewReference("");
+                  setNewZoneName("");
+                  setNewMaxDist("");
                   setNewFee("");
+                  setNewDesc("");
                   toast.success("Zona adicionada!");
                 }}
                 className="gradient-red text-primary-foreground rounded-lg py-2 px-4 text-sm font-medium flex items-center gap-1"
@@ -186,14 +190,15 @@ const Admin = () => {
               </button>
             </div>
 
-            {/* Zones list grouped by neighborhood */}
-            {Object.entries(zonesByNeighborhood).map(([neighborhood, nZones]) => (
-              <div key={neighborhood} className="space-y-2">
-                <h3 className="text-sm font-bold text-primary">{neighborhood}</h3>
-                {nZones.map((z) => (
-                  <div key={z.id} className="bg-card border border-border rounded-lg p-3 flex items-center justify-between gap-2">
+            {/* Zones list */}
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold text-foreground">Zonas configuradas</h3>
+              {zones.sort((a, b) => a.maxDistanceKm - b.maxDistanceKm).map((z) => (
+                <div key={z.id} className="bg-card border border-border rounded-lg p-3 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-foreground truncate">{z.reference}</p>
+                      <p className="text-sm font-medium text-foreground">{z.zone}</p>
+                      <p className="text-xs text-muted-foreground">Até {z.maxDistanceKm} km — {z.description}</p>
                       {editingId === z.id ? (
                         <input
                           type="number"
@@ -219,17 +224,22 @@ const Admin = () => {
                         </button>
                       )}
                     </div>
-                    <Switch
-                      checked={z.active}
-                      onCheckedChange={(checked) => {
-                        updateZone(z.id, { active: checked });
-                        toast.success(checked ? "Zona ativada" : "Zona desativada");
-                      }}
-                    />
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={z.active}
+                        onCheckedChange={(checked) => {
+                          updateZone(z.id, { active: checked });
+                          toast.success(checked ? "Zona ativada" : "Zona desativada");
+                        }}
+                      />
+                      <button onClick={() => { removeZone(z.id); toast.success("Zona removida"); }}>
+                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive transition-colors" />
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            ))}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

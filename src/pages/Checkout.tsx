@@ -5,10 +5,10 @@ import { useDeliveryZones } from "@/hooks/useDeliveryZones";
 import { useCustomers } from "@/hooks/useCustomers";
 import { CustomerAddress } from "@/data/customer";
 import { createOrderFromCheckout, saveOrder } from "@/data/orders";
-import { referenceSuggestions } from "@/data/deliveryZones";
+import { OUT_OF_RANGE_MESSAGE } from "@/data/deliveryZones";
 import Header from "@/components/Header";
 import { toast } from "sonner";
-import { MessageCircle, Copy, ChevronDown, User, MapPin, Plus, Check, Phone } from "lucide-react";
+import { MessageCircle, Copy, ChevronDown, User, MapPin, Plus, Check, Phone, Navigation, Loader2 } from "lucide-react";
 
 const formatPhone = (value: string) => {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -19,7 +19,7 @@ const formatPhone = (value: string) => {
 
 const Checkout = () => {
   const { items, total, clearCart } = useCart();
-  const { neighborhoods, getReferencesForNeighborhood, findZone } = useDeliveryZones();
+  const { calculateFee } = useDeliveryZones();
   const { currentCustomer, lookupByPhone, createOrUpdate, addAddress } = useCustomers();
   const navigate = useNavigate();
 
@@ -36,12 +36,14 @@ const Checkout = () => {
   const [showNewAddress, setShowNewAddress] = useState(false);
   const [newAddress, setNewAddress] = useState({ label: "", street: "", number: "", neighborhood: "", reference: "" });
 
+  // Geolocation
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [customerCoords, setCustomerCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoError, setGeoError] = useState("");
+
   // Payment
   const [payment, setPayment] = useState<"pix" | "dinheiro">("pix");
   const [changeFor, setChangeFor] = useState("");
-
-  // Reference suggestions filter
-  const [showRefSuggestions, setShowRefSuggestions] = useState(false);
 
   // Derived
   const selectedAddress = useMemo(() => {
@@ -51,14 +53,51 @@ const Checkout = () => {
     return null;
   }, [selectedAddressId, currentCustomer]);
 
-  const activeNeighborhood = selectedAddress?.neighborhood || newAddress.neighborhood;
-  const activeReference = selectedAddress?.reference || newAddress.reference;
+  // Fee calculation based on geolocation
+  const feeResult = useMemo(() => {
+    if (!customerCoords) return null;
+    return calculateFee(customerCoords.lat, customerCoords.lng);
+  }, [customerCoords, calculateFee]);
 
-  const matchedZone = activeNeighborhood && activeReference ? findZone(activeNeighborhood, activeReference) : null;
-  const deliveryFee = matchedZone?.fee || 0;
+  const deliveryFee = feeResult?.fee || 0;
   const grandTotal = total + deliveryFee;
 
-  const availableReferences = activeNeighborhood ? getReferencesForNeighborhood(activeNeighborhood) : [];
+  // Geolocation handler
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      setGeoError("Geolocalização não suportada pelo navegador.");
+      return;
+    }
+    setGeoLoading(true);
+    setGeoError("");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setCustomerCoords(coords);
+        setGeoLoading(false);
+        const result = calculateFee(coords.lat, coords.lng);
+        if (result) {
+          toast.success(`📍 ${result.distanceKm} km — Frete: R$ ${result.fee.toFixed(2)}`);
+        } else {
+          toast.error(OUT_OF_RANGE_MESSAGE);
+        }
+      },
+      (err) => {
+        setGeoLoading(false);
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            setGeoError("Permissão de localização negada. Ative nas configurações do navegador.");
+            break;
+          case err.POSITION_UNAVAILABLE:
+            setGeoError("Localização indisponível.");
+            break;
+          default:
+            setGeoError("Não foi possível obter sua localização.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   // Phone lookup
   const handlePhoneLookup = () => {
@@ -80,8 +119,8 @@ const Checkout = () => {
   };
 
   const handleAddNewAddress = () => {
-    if (!newAddress.street || !newAddress.number || !newAddress.neighborhood || !newAddress.reference) {
-      toast.error("Preencha todos os campos do endereço!");
+    if (!newAddress.street || !newAddress.number || !newAddress.neighborhood) {
+      toast.error("Preencha rua, número e bairro!");
       return;
     }
     if (!name) {
@@ -94,7 +133,7 @@ const Checkout = () => {
 
     const addr: CustomerAddress = {
       id: `addr-${Date.now()}`,
-      label: newAddress.label || `${newAddress.neighborhood}`,
+      label: newAddress.label || newAddress.neighborhood,
       street: newAddress.street,
       number: newAddress.number,
       neighborhood: newAddress.neighborhood,
@@ -125,6 +164,14 @@ const Checkout = () => {
       toast.error("Selecione ou adicione um endereço!");
       return;
     }
+    if (!customerCoords) {
+      toast.error("Use sua localização para calcular o frete!");
+      return;
+    }
+    if (!feeResult) {
+      toast.error(OUT_OF_RANGE_MESSAGE);
+      return;
+    }
     if (items.length === 0) {
       toast.error("Carrinho vazio!");
       return;
@@ -134,7 +181,7 @@ const Checkout = () => {
     const digits = phone.replace(/\D/g, "");
     createOrUpdate(digits, name);
 
-    // Save order to localStorage
+    // Save order
     const order = createOrderFromCheckout(
       name, digits, finalAddress as any, items, total, deliveryFee, grandTotal, payment
     );
@@ -155,7 +202,10 @@ const Checkout = () => {
 *Endereço:*
 ${finalAddress.street}, ${finalAddress.number}
 Bairro: ${finalAddress.neighborhood}
-Ponto referência: ${finalAddress.reference}
+${finalAddress.reference ? `Ref: ${finalAddress.reference}` : ""}
+
+📍 Distância: ${feeResult.distanceKm} km
+🛵 Zona: ${feeResult.zone.zone}
 
 *Pedido:*
 ${itemsText}
@@ -218,7 +268,7 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
           )}
         </div>
 
-        {/* STEP 2: Name + Address */}
+        {/* STEP 2: Name + Address + Location */}
         {step !== "phone" && (
           <>
             <div className="space-y-3 animate-fade-in">
@@ -233,6 +283,42 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
               />
             </div>
 
+            {/* Geolocation */}
+            <div className="space-y-3 animate-fade-in">
+              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Navigation className="h-4 w-4 text-primary" /> Sua Localização
+              </h2>
+              <button
+                onClick={handleGetLocation}
+                disabled={geoLoading}
+                className="w-full bg-secondary border border-border rounded-lg py-3 flex items-center justify-center gap-2 text-sm text-foreground hover:border-primary/50 transition-colors disabled:opacity-50"
+              >
+                {geoLoading ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" /> Obtendo localização...</>
+                ) : customerCoords ? (
+                  <><Check className="h-4 w-4 text-primary" /> Localização obtida — Atualizar</>
+                ) : (
+                  <><Navigation className="h-4 w-4" /> Usar minha localização</>
+                )}
+              </button>
+              {geoError && <p className="text-xs text-destructive">{geoError}</p>}
+              {customerCoords && feeResult && (
+                <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                  <p className="text-sm font-bold text-primary">
+                    📍 {feeResult.distanceKm} km — 🛵 Frete: R$ {feeResult.fee.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Zona: {feeResult.zone.zone} — {feeResult.zone.description}</p>
+                </div>
+              )}
+              {customerCoords && !feeResult && (
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                  <p className="text-sm font-bold text-destructive">❌ {OUT_OF_RANGE_MESSAGE}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Distância máxima: 5 km</p>
+                </div>
+              )}
+            </div>
+
+            {/* Address */}
             <div className="space-y-3 animate-fade-in">
               <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-primary" /> Endereço de Entrega
@@ -261,7 +347,7 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
                       <p className="text-xs text-muted-foreground mt-1">
                         {addr.street}, {addr.number} — {addr.neighborhood}
                       </p>
-                      <p className="text-xs text-muted-foreground">Ref: {addr.reference}</p>
+                      {addr.reference && <p className="text-xs text-muted-foreground">Ref: {addr.reference}</p>}
                     </button>
                   ))}
                 </div>
@@ -299,72 +385,18 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
                     value={newAddress.number}
                     onChange={(e) => setNewAddress((p) => ({ ...p, number: e.target.value }))}
                   />
-
-                  {/* Neighborhood dropdown */}
-                  <div className="relative">
-                    <select
-                      value={newAddress.neighborhood}
-                      onChange={(e) => setNewAddress((p) => ({ ...p, neighborhood: e.target.value, reference: "" }))}
-                      className={`${inputClass} appearance-none pr-10 ${!newAddress.neighborhood ? "text-muted-foreground" : ""}`}
-                    >
-                      <option value="">Bairro *</option>
-                      {neighborhoods.map((n) => (
-                        <option key={n} value={n}>{n}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  </div>
-
-                  {/* Reference with suggestions */}
-                  <div className="relative">
-                    <input
-                      className={inputClass}
-                      placeholder="Ponto de referência *"
-                      value={newAddress.reference}
-                      onChange={(e) => setNewAddress((p) => ({ ...p, reference: e.target.value }))}
-                      onFocus={() => setShowRefSuggestions(true)}
-                      onBlur={() => setTimeout(() => setShowRefSuggestions(false), 200)}
-                    />
-                    {showRefSuggestions && newAddress.neighborhood && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg z-20 max-h-40 overflow-y-auto">
-                        {availableReferences.length > 0 && (
-                          <>
-                            <p className="text-xs text-muted-foreground px-3 pt-2 pb-1">Zonas cadastradas:</p>
-                            {availableReferences.map((z) => (
-                              <button
-                                key={z.id}
-                                className="w-full text-left px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors flex justify-between"
-                                onMouseDown={() => setNewAddress((p) => ({ ...p, reference: z.reference }))}
-                              >
-                                <span>{z.reference}</span>
-                                <span className="text-primary text-xs">R$ {z.fee.toFixed(2)}</span>
-                              </button>
-                            ))}
-                          </>
-                        )}
-                        <p className="text-xs text-muted-foreground px-3 pt-2 pb-1">Sugestões:</p>
-                        {referenceSuggestions
-                          .filter((s) => !availableReferences.some((z) => z.reference === s))
-                          .map((s) => (
-                            <button
-                              key={s}
-                              className="w-full text-left px-3 py-2 text-sm text-muted-foreground hover:bg-secondary transition-colors"
-                              onMouseDown={() => setNewAddress((p) => ({ ...p, reference: s }))}
-                            >
-                              {s}
-                            </button>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {newAddress.neighborhood && newAddress.reference && (
-                    <p className="text-xs text-primary">
-                      {matchedZone
-                        ? `🛵 Taxa de entrega: R$ ${matchedZone.fee.toFixed(2)}`
-                        : "⚠️ Zona não cadastrada — consulte pelo WhatsApp"}
-                    </p>
-                  )}
+                  <input
+                    className={inputClass}
+                    placeholder="Bairro *"
+                    value={newAddress.neighborhood}
+                    onChange={(e) => setNewAddress((p) => ({ ...p, neighborhood: e.target.value }))}
+                  />
+                  <input
+                    className={inputClass}
+                    placeholder="Ponto de referência (opcional)"
+                    value={newAddress.reference}
+                    onChange={(e) => setNewAddress((p) => ({ ...p, reference: e.target.value }))}
+                  />
 
                   <div className="flex gap-2">
                     <button
@@ -382,21 +414,9 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
                   </div>
                 </div>
               )}
-
-              {/* Show fee for selected saved address */}
-              {selectedAddress && (
-                <p className="text-xs text-primary">
-                  {(() => {
-                    const zone = findZone(selectedAddress.neighborhood, selectedAddress.reference);
-                    return zone
-                      ? `🛵 Taxa de entrega para ${selectedAddress.neighborhood}: R$ ${zone.fee.toFixed(2)}`
-                      : "⚠️ Zona não cadastrada — consulte pelo WhatsApp";
-                  })()}
-                </p>
-              )}
             </div>
 
-            {/* STEP 3: Payment */}
+            {/* Payment */}
             <div className="space-y-3 animate-fade-in">
               <h2 className="text-sm font-bold text-foreground">Forma de Pagamento</h2>
               <div className="flex gap-3">
@@ -469,7 +489,7 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Taxa de entrega</span>
                   <span className="text-foreground">
-                    {deliveryFee > 0 ? `R$ ${deliveryFee.toFixed(2)}` : "Selecione endereço"}
+                    {feeResult ? `R$ ${deliveryFee.toFixed(2)}` : customerCoords ? "Fora da área" : "Use sua localização"}
                   </span>
                 </div>
                 <div className="border-t border-border pt-2 flex justify-between font-bold">
@@ -482,7 +502,8 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
             {/* Submit */}
             <button
               onClick={handleSubmit}
-              className="w-full gradient-red text-primary-foreground py-4 rounded-full font-bold text-base flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
+              disabled={!feeResult}
+              className="w-full gradient-red text-primary-foreground py-4 rounded-full font-bold text-base flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-95 disabled:opacity-50"
             >
               <MessageCircle className="h-5 w-5" />
               Enviar Pedido no WhatsApp
