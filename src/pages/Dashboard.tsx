@@ -60,12 +60,36 @@ const Dashboard = () => {
   const [tab, setTab] = useState<"dashboard" | "pedidos" | "produtos" | "clientes" | "bairros" | "pagamentos">("dashboard");
   const [chartDays, setChartDays] = useState(7);
   const [orderFilter, setOrderFilter] = useState<"hoje" | "ontem" | "7dias" | "mes">("hoje");
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   const {
+    orders, refresh,
     ordersToday, ordersYesterday, ordersLast7, ordersThisMonth,
     sumTotal, sumSubtotal, sumDeliveryFees, avgTicket, uniqueCustomers, totalItemsSold,
     productRanking, topCustomers, neighborhoodStats, paymentStats, dailySales, updateStatus,
   } = useOrders();
+
+  // Poll for new orders every 5 seconds
+  const lastOrderCountRef = useRef(orders.length);
+
+  useEffect(() => {
+    if (!auth) return;
+
+    const interval = setInterval(() => {
+      const currentOrders = loadOrders();
+      if (currentOrders.length > lastOrderCountRef.current) {
+        const newCount = currentOrders.length - lastOrderCountRef.current;
+        refresh();
+        if (soundEnabled) {
+          playNotificationSound();
+        }
+        toast.success(`🔔 ${newCount} novo(s) pedido(s)!`, { duration: 5000 });
+      }
+      lastOrderCountRef.current = currentOrders.length;
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [auth, soundEnabled, refresh]);
 
   if (!auth) {
     return (
