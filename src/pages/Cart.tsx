@@ -1,10 +1,21 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingBag, MessageSquare } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import Header from "@/components/Header";
 
 const Cart = () => {
-  const { items, updateQuantity, removeItem, total } = useCart();
+  const { items, updateQuantity, updateNotes, removeItem, total } = useCart();
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
+
+  const toggleNotes = (id: string) => {
+    setExpandedNotes((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   if (items.length === 0) {
     return (
@@ -52,6 +63,27 @@ const Cart = () => {
                   R$ {(item.product.price * item.quantity).toFixed(2)}
                 </span>
               </div>
+
+              {/* Notes toggle */}
+              <button
+                onClick={() => toggleNotes(item.product.id)}
+                className={`mt-2 flex items-center gap-1.5 text-xs transition-colors ${
+                  item.notes ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                {item.notes ? "Observação adicionada" : "Adicionar observação"}
+              </button>
+
+              {expandedNotes.has(item.product.id) && (
+                <textarea
+                  className="mt-2 w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 resize-none"
+                  rows={2}
+                  placeholder="Ex: sem cebolinha, extra cream cheese..."
+                  value={item.notes || ""}
+                  onChange={(e) => updateNotes(item.product.id, e.target.value)}
+                />
+              )}
             </div>
           ))}
         </div>
