@@ -1,13 +1,47 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useOrders } from "@/hooks/useOrders";
-import { Order } from "@/data/orders";
+import { Order, loadOrders } from "@/data/orders";
 import Header from "@/components/Header";
 import { toast } from "sonner";
-import { Lock, TrendingUp, ShoppingBag, Users, MapPin, CreditCard, Download, BarChart3, Package, Crown } from "lucide-react";
+import { Lock, TrendingUp, ShoppingBag, Users, MapPin, CreditCard, Download, BarChart3, Package, Crown, Bell, BellOff } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { format, parseISO } from "date-fns";
 
 const ADMIN_PASS = "katsuya2024";
+
+// Generate notification sound using Web Audio API
+const playNotificationSound = () => {
+  try {
+    const ctx = new AudioContext();
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(880, ctx.currentTime);
+    osc1.frequency.setValueAtTime(1100, ctx.currentTime + 0.15);
+
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(660, ctx.currentTime + 0.3);
+    osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.45);
+
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.3);
+    osc2.start(ctx.currentTime + 0.3);
+    osc2.stop(ctx.currentTime + 0.6);
+
+    setTimeout(() => ctx.close(), 1000);
+  } catch {
+    // Audio not available
+  }
+};
 
 const statusLabels: Record<Order["status"], string> = {
   pendente: "⏳ Pendente",
@@ -26,12 +60,36 @@ const Dashboard = () => {
   const [tab, setTab] = useState<"dashboard" | "pedidos" | "produtos" | "clientes" | "bairros" | "pagamentos">("dashboard");
   const [chartDays, setChartDays] = useState(7);
   const [orderFilter, setOrderFilter] = useState<"hoje" | "ontem" | "7dias" | "mes">("hoje");
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
   const {
+    orders, refresh,
     ordersToday, ordersYesterday, ordersLast7, ordersThisMonth,
     sumTotal, sumSubtotal, sumDeliveryFees, avgTicket, uniqueCustomers, totalItemsSold,
     productRanking, topCustomers, neighborhoodStats, paymentStats, dailySales, updateStatus,
   } = useOrders();
+
+  // Poll for new orders every 5 seconds
+  const lastOrderCountRef = useRef(orders.length);
+
+  useEffect(() => {
+    if (!auth) return;
+
+    const interval = setInterval(() => {
+      const currentOrders = loadOrders();
+      if (currentOrders.length > lastOrderCountRef.current) {
+        const newCount = currentOrders.length - lastOrderCountRef.current;
+        refresh();
+        if (soundEnabled) {
+          playNotificationSound();
+        }
+        toast.success(`🔔 ${newCount} novo(s) pedido(s)!`, { duration: 5000 });
+      }
+      lastOrderCountRef.current = currentOrders.length;
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [auth, soundEnabled, refresh]);
 
   if (!auth) {
     return (
@@ -94,7 +152,20 @@ const Dashboard = () => {
     <div className="min-h-screen bg-background pb-10">
       <Header />
       <div className="container py-4">
-        <h1 className="font-display text-xl font-bold text-foreground mb-4">Dashboard</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="font-display text-xl font-bold text-foreground">Dashboard</h1>
+          <button
+            onClick={() => {
+              setSoundEnabled((prev) => !prev);
+              if (!soundEnabled) playNotificationSound();
+              toast.success(soundEnabled ? "🔇 Notificação sonora desativada" : "🔔 Notificação sonora ativada");
+            }}
+            className={`p-2 rounded-lg border transition-colors ${soundEnabled ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"}`}
+            title={soundEnabled ? "Desativar som" : "Ativar som"}
+          >
+            {soundEnabled ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}
+          </button>
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-4 scrollbar-hide">
