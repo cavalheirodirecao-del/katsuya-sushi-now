@@ -134,6 +134,12 @@ const Checkout = () => {
     const digits = phone.replace(/\D/g, "");
     createOrUpdate(digits, name);
 
+    // Save order to localStorage
+    const order = createOrderFromCheckout(
+      name, digits, finalAddress as any, items, total, deliveryFee, grandTotal, payment
+    );
+    saveOrder(order);
+
     const itemsText = items
       .map((i) => `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}${i.notes ? `\n   _Obs: ${i.notes}_` : ""}`)
       .join("\n");
