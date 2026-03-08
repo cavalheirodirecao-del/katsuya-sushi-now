@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useNavigate } from "react-router-dom";
+import { useNeighborhoods } from "@/hooks/useNeighborhoods";
 import Header from "@/components/Header";
 import { toast } from "sonner";
-import { MessageCircle, Copy } from "lucide-react";
+import { MessageCircle, Copy, ChevronDown } from "lucide-react";
 
 interface CustomerInfo {
   name: string;
@@ -11,32 +12,41 @@ interface CustomerInfo {
   email: string;
   address: string;
   number: string;
-  neighborhood: string;
   complement: string;
   reference: string;
 }
 
 const Checkout = () => {
   const { items, total, clearCart } = useCart();
+  const { activeNeighborhoods } = useNeighborhoods();
   const navigate = useNavigate();
 
   const [customer, setCustomer] = useState<CustomerInfo>(() => {
     const saved = localStorage.getItem("katsuya-customer");
     return saved
       ? JSON.parse(saved)
-      : { name: "", phone: "", email: "", address: "", number: "", neighborhood: "", complement: "", reference: "" };
+      : { name: "", phone: "", email: "", address: "", number: "", complement: "", reference: "" };
   });
 
+  const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState("");
   const [payment, setPayment] = useState<"pix" | "dinheiro">("pix");
   const [changeFor, setChangeFor] = useState("");
+
+  const selectedNeighborhood = activeNeighborhoods.find((n) => n.id === selectedNeighborhoodId);
+  const deliveryFee = selectedNeighborhood?.fee || 0;
+  const grandTotal = total + deliveryFee;
 
   const updateField = (field: keyof CustomerInfo, value: string) => {
     setCustomer((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = () => {
-    if (!customer.name || !customer.phone || !customer.address || !customer.number || !customer.neighborhood) {
+    if (!customer.name || !customer.phone || !customer.address || !customer.number) {
       toast.error("Preencha os campos obrigatórios!");
+      return;
+    }
+    if (!selectedNeighborhoodId) {
+      toast.error("Selecione o bairro de entrega!");
       return;
     }
     if (items.length === 0) {
@@ -47,7 +57,7 @@ const Checkout = () => {
     localStorage.setItem("katsuya-customer", JSON.stringify(customer));
 
     const itemsText = items
-      .map((i) => `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""} - R$ ${(i.product.price * i.quantity).toFixed(2)}`)
+      .map((i) => `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}`)
       .join("\n");
 
     const paymentText =
@@ -60,12 +70,15 @@ const Checkout = () => {
 
 *Endereço:*
 ${customer.address}, ${customer.number}
-${customer.neighborhood}${customer.complement ? ` — ${customer.complement}` : ""}${customer.reference ? `\nReferência: ${customer.reference}` : ""}
+Bairro: ${selectedNeighborhood?.name}${customer.complement ? `\nComplemento: ${customer.complement}` : ""}${customer.reference ? `\nPonto de referência: ${customer.reference}` : ""}
 
-*Itens do pedido:*
+*Pedido:*
 ${itemsText}
 
-*Total: R$ ${total.toFixed(2)}*
+Subtotal: R$ ${total.toFixed(2)}
+Taxa entrega: R$ ${deliveryFee.toFixed(2)}
+
+*Total: R$ ${grandTotal.toFixed(2)}*
 
 *Pagamento:* ${paymentText}`;
 
@@ -91,13 +104,33 @@ ${itemsText}
           <input className={inputClass} placeholder="Nome *" value={customer.name} onChange={(e) => updateField("name", e.target.value)} />
           <input className={inputClass} placeholder="Telefone *" value={customer.phone} onChange={(e) => updateField("phone", e.target.value)} />
           <input className={inputClass} placeholder="Email" value={customer.email} onChange={(e) => updateField("email", e.target.value)} />
-          <input className={inputClass} placeholder="Endereço *" value={customer.address} onChange={(e) => updateField("address", e.target.value)} />
-          <div className="grid grid-cols-2 gap-3">
-            <input className={inputClass} placeholder="Número *" value={customer.number} onChange={(e) => updateField("number", e.target.value)} />
-            <input className={inputClass} placeholder="Bairro *" value={customer.neighborhood} onChange={(e) => updateField("neighborhood", e.target.value)} />
+          <input className={inputClass} placeholder="Rua *" value={customer.address} onChange={(e) => updateField("address", e.target.value)} />
+          <input className={inputClass} placeholder="Número *" value={customer.number} onChange={(e) => updateField("number", e.target.value)} />
+
+          {/* Neighborhood dropdown */}
+          <div className="relative">
+            <select
+              value={selectedNeighborhoodId}
+              onChange={(e) => setSelectedNeighborhoodId(e.target.value)}
+              className={`${inputClass} appearance-none pr-10 ${!selectedNeighborhoodId ? "text-muted-foreground" : ""}`}
+            >
+              <option value="">Selecionar bairro *</option>
+              {activeNeighborhoods.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.name} — R$ {n.fee.toFixed(2)}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           </div>
+          {selectedNeighborhood && (
+            <p className="text-xs text-primary">
+              🛵 Taxa de entrega para {selectedNeighborhood.name}: R$ {selectedNeighborhood.fee.toFixed(2)}
+            </p>
+          )}
+
           <input className={inputClass} placeholder="Complemento" value={customer.complement} onChange={(e) => updateField("complement", e.target.value)} />
-          <input className={inputClass} placeholder="Referência" value={customer.reference} onChange={(e) => updateField("reference", e.target.value)} />
+          <input className={inputClass} placeholder="Ponto de referência (ex: próximo ao posto)" value={customer.reference} onChange={(e) => updateField("reference", e.target.value)} />
         </div>
 
         {/* Payment */}
@@ -165,9 +198,21 @@ ${itemsText}
               <span className="text-foreground">R$ {(i.product.price * i.quantity).toFixed(2)}</span>
             </div>
           ))}
-          <div className="border-t border-border pt-2 flex justify-between font-bold">
-            <span className="text-foreground">Total</span>
-            <span className="text-primary">R$ {total.toFixed(2)}</span>
+          <div className="border-t border-border pt-2 space-y-1">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="text-foreground">R$ {total.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Taxa de entrega</span>
+              <span className="text-foreground">
+                {selectedNeighborhood ? `R$ ${deliveryFee.toFixed(2)}` : "Selecione o bairro"}
+              </span>
+            </div>
+            <div className="border-t border-border pt-2 flex justify-between font-bold">
+              <span className="text-foreground">Total</span>
+              <span className="text-primary">R$ {grandTotal.toFixed(2)}</span>
+            </div>
           </div>
         </div>
 
