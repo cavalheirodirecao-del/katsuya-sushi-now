@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useOrders } from "@/hooks/useOrders";
-import { Order, loadOrders } from "@/data/orders";
+import { useState, useEffect, useRef } from "react";
+import { useOrdersDB, OrderDB, OrderStatus } from "@/hooks/useOrdersDB";
+import { useProductsDB } from "@/hooks/useProductsDB";
 import Header from "@/components/Header";
+import { OrderKanban } from "@/components/OrderKanban";
+import { StockManager } from "@/components/StockManager";
 import { toast } from "sonner";
-import { Lock, TrendingUp, ShoppingBag, Users, MapPin, CreditCard, Download, BarChart3, Package, Crown, Bell, BellOff } from "lucide-react";
+import { Lock, TrendingUp, ShoppingBag, Users, MapPin, CreditCard, Download, BarChart3, Package, Crown, Bell, BellOff, Boxes, Loader2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { format, parseISO } from "date-fns";
 
@@ -43,53 +45,50 @@ const playNotificationSound = () => {
   }
 };
 
-const statusLabels: Record<Order["status"], string> = {
-  pendente: "⏳ Pendente",
-  confirmado: "✅ Confirmado",
-  preparando: "🍣 Preparando",
-  saiu_entrega: "🛵 Saiu p/ entrega",
-  entregue: "📦 Entregue",
-  cancelado: "❌ Cancelado",
-};
-
-const statusOptions: Order["status"][] = ["pendente", "confirmado", "preparando", "saiu_entrega", "entregue", "cancelado"];
-
 const Dashboard = () => {
   const [auth, setAuth] = useState(false);
   const [pass, setPass] = useState("");
-  const [tab, setTab] = useState<"dashboard" | "pedidos" | "produtos" | "clientes" | "bairros" | "pagamentos">("dashboard");
+  const [tab, setTab] = useState<"kanban" | "dashboard" | "pedidos" | "estoque" | "clientes" | "bairros" | "pagamentos">("kanban");
   const [chartDays, setChartDays] = useState(7);
   const [orderFilter, setOrderFilter] = useState<"hoje" | "ontem" | "7dias" | "mes">("hoje");
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   const {
-    orders, refresh,
+    orders, loading: ordersLoading, refresh: refreshOrders,
     ordersToday, ordersYesterday, ordersLast7, ordersThisMonth,
     sumTotal, sumSubtotal, sumDeliveryFees, avgTicket, uniqueCustomers, totalItemsSold,
     productRanking, topCustomers, neighborhoodStats, paymentStats, dailySales, updateStatus,
-  } = useOrders();
+  } = useOrdersDB();
 
-  // Poll for new orders every 5 seconds
+  const {
+    products, loading: productsLoading,
+    updateStock, toggleActive, getLowStock, getOutOfStock,
+  } = useProductsDB();
+
+  // Notification for new orders
   const lastOrderCountRef = useRef(orders.length);
 
   useEffect(() => {
-    if (!auth) return;
+    if (!auth || ordersLoading) return;
 
-    const interval = setInterval(() => {
-      const currentOrders = loadOrders();
-      if (currentOrders.length > lastOrderCountRef.current) {
-        const newCount = currentOrders.length - lastOrderCountRef.current;
-        refresh();
-        if (soundEnabled) {
-          playNotificationSound();
-        }
-        toast.success(`🔔 ${newCount} novo(s) pedido(s)!`, { duration: 5000 });
+    if (orders.length > lastOrderCountRef.current) {
+      const newCount = orders.length - lastOrderCountRef.current;
+      if (soundEnabled) {
+        playNotificationSound();
       }
-      lastOrderCountRef.current = currentOrders.length;
-    }, 5000);
+      toast.success(`🔔 ${newCount} novo(s) pedido(s)!`, { duration: 5000 });
+    }
+    lastOrderCountRef.current = orders.length;
+  }, [auth, soundEnabled, orders.length, ordersLoading]);
 
-    return () => clearInterval(interval);
-  }, [auth, soundEnabled, refresh]);
+  const handleStatusChange = async (id: string, status: OrderStatus) => {
+    const success = await updateStatus(id, status);
+    if (success) {
+      toast.success("Status atualizado!");
+    } else {
+      toast.error("Erro ao atualizar status");
+    }
+  };
 
   if (!auth) {
     return (
@@ -115,10 +114,14 @@ const Dashboard = () => {
 
   const filteredOrders = orderFilter === "hoje" ? ordersToday : orderFilter === "ontem" ? ordersYesterday : orderFilter === "7dias" ? ordersLast7 : ordersThisMonth;
   const chartData = dailySales(chartDays);
-  const products = productRanking(ordersThisMonth);
+  const productsStats = productRanking(ordersThisMonth);
   const customers = topCustomers(ordersThisMonth);
   const neighborhoods = neighborhoodStats(ordersThisMonth);
   const payments = paymentStats(ordersThisMonth);
+
+  const pendingCount = orders.filter((o) => o.status === "pendente").length;
+  const lowStockCount = getLowStock().length;
+  const outOfStockCount = getOutOfStock().length;
 
   const exportCSV = (data: Record<string, unknown>[], filename: string) => {
     if (data.length === 0) { toast.error("Sem dados para exportar"); return; }
@@ -133,20 +136,29 @@ const Dashboard = () => {
 
   const exportOrders = () => {
     exportCSV(filteredOrders.map((o) => ({
-      pedido: o.id, data: format(parseISO(o.date), "dd/MM/yyyy HH:mm"), cliente: o.customerName, telefone: o.customerPhone,
-      bairro: o.address.neighborhood, subtotal: o.subtotal.toFixed(2), frete: o.deliveryFee.toFixed(2),
-      total: o.total.toFixed(2), pagamento: o.paymentMethod, status: o.status,
+      pedido: o.order_number, data: format(parseISO(o.created_at), "dd/MM/yyyy HH:mm"), cliente: o.customer_name, telefone: o.customer_phone,
+      bairro: o.address_neighborhood, subtotal: Number(o.subtotal).toFixed(2), frete: Number(o.delivery_fee).toFixed(2),
+      total: Number(o.total).toFixed(2), pagamento: o.payment_method, status: o.status,
     })), "pedidos-katsuya");
   };
 
   const tabs = [
+    { id: "kanban" as const, label: "📋 Pedidos", icon: ShoppingBag, badge: pendingCount },
+    { id: "estoque" as const, label: "📦 Estoque", icon: Boxes, badge: outOfStockCount > 0 ? outOfStockCount : lowStockCount },
     { id: "dashboard" as const, label: "📊 Dashboard", icon: BarChart3 },
-    { id: "pedidos" as const, label: "📋 Pedidos", icon: ShoppingBag },
-    { id: "produtos" as const, label: "🍣 Produtos", icon: Package },
+    { id: "pedidos" as const, label: "📜 Histórico", icon: Package },
     { id: "clientes" as const, label: "👥 Clientes", icon: Users },
     { id: "bairros" as const, label: "📍 Bairros", icon: MapPin },
     { id: "pagamentos" as const, label: "💳 Pagamentos", icon: CreditCard },
   ];
+
+  if (ordersLoading || productsLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background pb-10">
@@ -171,11 +183,34 @@ const Dashboard = () => {
         <div className="flex gap-1.5 overflow-x-auto pb-2 mb-4 scrollbar-hide">
           {tabs.map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${tab === t.id ? "gradient-red text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
+              className={`relative px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${tab === t.id ? "gradient-red text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}>
               {t.label}
+              {t.badge !== undefined && t.badge > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full px-1">
+                  {t.badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
+
+        {/* KANBAN - Painel de Pedidos */}
+        {tab === "kanban" && (
+          <div className="animate-fade-in">
+            <OrderKanban orders={orders} onStatusChange={handleStatusChange} />
+          </div>
+        )}
+
+        {/* ESTOQUE */}
+        {tab === "estoque" && (
+          <div className="animate-fade-in">
+            <StockManager 
+              products={products} 
+              onUpdateStock={updateStock} 
+              onToggleActive={toggleActive} 
+            />
+          </div>
+        )}
 
         {/* DASHBOARD */}
         {tab === "dashboard" && (
@@ -220,18 +255,18 @@ const Dashboard = () => {
               </div>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 18%)" />
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(0 0% 55%)" }} />
-                  <YAxis tick={{ fontSize: 10, fill: "hsl(0 0% 55%)" }} />
-                  <RechartsTooltip contentStyle={{ background: "hsl(0 0% 11%)", border: "1px solid hsl(0 0% 18%)", borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="total" fill="hsl(0 80% 50%)" radius={[4, 4, 0, 0]} name="Vendas (R$)" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
+                  <RechartsTooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8, fontSize: 12 }} />
+                  <Bar dataKey="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Vendas (R$)" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
         )}
 
-        {/* PEDIDOS */}
+        {/* HISTÓRICO DE PEDIDOS */}
         {tab === "pedidos" && (
           <div className="space-y-4 animate-fade-in">
             <div className="flex items-center justify-between">
@@ -253,60 +288,13 @@ const Dashboard = () => {
             <div className="space-y-2">
               {filteredOrders.length === 0 && <p className="text-muted-foreground text-center py-8 text-sm">Nenhum pedido neste período.</p>}
               {filteredOrders.map((o) => (
-                <div key={o.id} className="bg-card border border-border rounded-lg p-3 space-y-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-xs font-mono text-muted-foreground">{o.id}</p>
-                      <p className="text-sm font-bold text-foreground">{o.customerName}</p>
-                      <p className="text-xs text-muted-foreground">{o.customerPhone} — {o.address.neighborhood}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-muted-foreground">{format(parseISO(o.date), "dd/MM HH:mm")}</p>
-                      <p className="text-sm font-bold text-primary">R$ {o.total.toFixed(2)}</p>
-                    </div>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {o.items.map((i, idx) => <span key={idx}>{i.quantity}x {i.name}{idx < o.items.length - 1 ? " · " : ""}</span>)}
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <select
-                      value={o.status}
-                      onChange={(e) => updateStatus(o.id, e.target.value as Order["status"])}
-                      className="bg-secondary border border-border rounded px-2 py-1 text-xs text-foreground"
-                    >
-                      {statusOptions.map((s) => <option key={s} value={s}>{statusLabels[s]}</option>)}
-                    </select>
-                    <span className="text-xs text-muted-foreground">{o.paymentMethod.toUpperCase()}</span>
-                  </div>
-                </div>
+                <OrderHistoryCard key={o.id} order={o} onStatusChange={handleStatusChange} />
               ))}
             </div>
           </div>
         )}
 
         {/* PRODUTOS */}
-        {tab === "produtos" && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold text-foreground">🏆 Ranking de Produtos (Mês)</h3>
-              <button onClick={() => exportCSV(products.map((p) => ({ produto: p.name, quantidade: p.qty, faturamento: p.revenue.toFixed(2) })), "ranking-produtos")}
-                className="flex items-center gap-1 text-xs text-primary hover:underline"><Download className="h-3.5 w-3.5" /> CSV</button>
-            </div>
-            {products.length === 0 && <p className="text-muted-foreground text-center py-8 text-sm">Sem dados.</p>}
-            {products.map((p, i) => (
-              <div key={p.name} className="bg-card border border-border rounded-lg p-3 flex items-center gap-3">
-                <span className={`text-lg font-bold ${i < 3 ? "text-primary" : "text-muted-foreground"}`}>{i + 1}º</span>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">{p.name}</p>
-                  <p className="text-xs text-muted-foreground">{p.qty} vendas</p>
-                </div>
-                <span className="text-sm font-bold text-primary">R$ {p.revenue.toFixed(2)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* CLIENTES */}
         {tab === "clientes" && (
           <div className="space-y-4 animate-fade-in">
             <div className="flex justify-between items-center">
@@ -384,6 +372,46 @@ const KPICard = ({ icon, label, value }: { icon: React.ReactNode; label: string;
   <div className="bg-card border border-border rounded-lg p-3">
     <div className="flex items-center gap-1.5 text-muted-foreground mb-1">{icon}<span className="text-xs">{label}</span></div>
     <p className="text-lg font-bold text-foreground">{value}</p>
+  </div>
+);
+
+const statusLabels: Record<OrderStatus, string> = {
+  pendente: "⏳ Pendente",
+  confirmado: "✅ Confirmado",
+  preparando: "🍣 Preparando",
+  saiu_entrega: "🛵 Saiu p/ entrega",
+  entregue: "📦 Entregue",
+  cancelado: "❌ Cancelado",
+};
+
+const statusOptions: OrderStatus[] = ["pendente", "confirmado", "preparando", "saiu_entrega", "entregue", "cancelado"];
+
+const OrderHistoryCard = ({ order, onStatusChange }: { order: OrderDB; onStatusChange: (id: string, status: OrderStatus) => void }) => (
+  <div className="bg-card border border-border rounded-lg p-3 space-y-2">
+    <div className="flex justify-between items-start">
+      <div>
+        <p className="text-xs font-mono text-muted-foreground">{order.order_number}</p>
+        <p className="text-sm font-bold text-foreground">{order.customer_name}</p>
+        <p className="text-xs text-muted-foreground">{order.customer_phone} — {order.address_neighborhood}</p>
+      </div>
+      <div className="text-right">
+        <p className="text-xs text-muted-foreground">{format(parseISO(order.created_at), "dd/MM HH:mm")}</p>
+        <p className="text-sm font-bold text-primary">R$ {Number(order.total).toFixed(2)}</p>
+      </div>
+    </div>
+    <div className="text-xs text-muted-foreground">
+      {order.items?.map((i, idx) => <span key={idx}>{i.quantity}x {i.product_name}{idx < (order.items?.length || 0) - 1 ? " · " : ""}</span>)}
+    </div>
+    <div className="flex justify-between items-center">
+      <select
+        value={order.status}
+        onChange={(e) => onStatusChange(order.id, e.target.value as OrderStatus)}
+        className="bg-secondary border border-border rounded px-2 py-1 text-xs text-foreground"
+      >
+        {statusOptions.map((s) => <option key={s} value={s}>{statusLabels[s]}</option>)}
+      </select>
+      <span className="text-xs text-muted-foreground">{order.payment_method.toUpperCase()}</span>
+    </div>
   </div>
 );
 
