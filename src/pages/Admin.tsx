@@ -235,7 +235,7 @@ const Admin = () => {
                           onClick={() => { setEditingId(z.id); setEditPrice(String(z.fee)); }}
                           className="text-xs text-primary hover:underline"
                         >
-                          R$ {z.fee.toFixed(2)}
+                          R$ {Number(z.fee).toFixed(2)}
                         </button>
                       )}
                     </div>

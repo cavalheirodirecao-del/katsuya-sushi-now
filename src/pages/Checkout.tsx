@@ -120,7 +120,7 @@ const Checkout = () => {
     setStep("details");
   };
 
-  const handleAddNewAddress = () => {
+  const handleAddNewAddress = async () => {
     if (!newAddress.street || !newAddress.number || !newAddress.neighborhood) {
       toast.error("Preencha rua, número e bairro!");
       return;
@@ -131,19 +131,23 @@ const Checkout = () => {
     }
 
     const digits = phone.replace(/\D/g, "");
-    createOrUpdate(digits, name);
+    await createOrUpdate(digits, name);
 
-    const addr: CustomerAddress = {
-      id: `addr-${Date.now()}`,
+    const success = await addAddress(digits, {
       label: newAddress.label || newAddress.neighborhood,
       street: newAddress.street,
       number: newAddress.number,
       neighborhood: newAddress.neighborhood,
       reference: newAddress.reference,
-    };
+    });
 
-    addAddress(digits, addr);
-    setSelectedAddressId(addr.id);
+    if (success) {
+      // Refresh to get the new address with its DB id
+      const updated = await lookupByPhone(digits);
+      if (updated && updated.addresses.length > 0) {
+        setSelectedAddressId(updated.addresses[0].id);
+      }
+    }
     setShowNewAddress(false);
     setNewAddress({ label: "", street: "", number: "", neighborhood: "", reference: "" });
     toast.success("Endereço salvo! ✅");
