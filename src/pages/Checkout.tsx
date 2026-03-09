@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
 import { useCustomers, CustomerAddress } from "@/hooks/useCustomers";
 import { useOrdersDB, PaymentMethod } from "@/hooks/useOrdersDB";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
 
 import { OUT_OF_RANGE_MESSAGE } from "@/data/deliveryZones";
 import Header from "@/components/Header";
@@ -22,6 +23,7 @@ const Checkout = () => {
   const { calculateFee } = useDeliveryZones();
   const { currentCustomer, lookupByPhone, createOrUpdate, addAddress } = useCustomers();
   const { createOrder } = useOrdersDB();
+  const { settings } = useCompanySettings();
   const navigate = useNavigate();
 
   // Step management
@@ -229,7 +231,7 @@ const Checkout = () => {
     const paymentText =
       payment === "pix" ? "PIX — Vou enviar o comprovante." : `Dinheiro${changeFor ? ` — Troco para R$ ${changeFor}` : ""}`;
 
-    const message = `*Pedido Katsuya Sushi* 🍣
+    const message = `*Pedido ${settings.name}* 🍣
 *Nº ${order.order_number}*
 
 *Nome:* ${name}
@@ -254,7 +256,8 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
 *Pagamento:* ${paymentText}`;
 
     const encoded = encodeURIComponent(message);
-    window.open(`https://wa.me/5581982522785?text=${encoded}`, "_blank");
+    const whatsappPhone = settings.phone.replace(/\D/g, "");
+    window.open(`https://wa.me/${whatsappPhone}?text=${encoded}`, "_blank");
     clearCart();
     navigate("/");
     toast.success("Pedido enviado! Verifique o WhatsApp.");
