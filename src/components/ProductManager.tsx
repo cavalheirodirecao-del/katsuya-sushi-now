@@ -42,6 +42,7 @@ interface Props {
   loading: boolean;
   updateProduct: (id: string, updates: Partial<ProductDB>) => Promise<boolean>;
   refresh: () => Promise<void>;
+  categories: CategoryDB[];
 }
 
 const ProductManager = ({ products, loading, updateProduct, refresh }: Props) => {
