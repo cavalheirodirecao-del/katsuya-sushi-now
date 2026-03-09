@@ -34,8 +34,8 @@ export const useCompanySettings = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchSettings = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("company_settings" as any)
+    const { data, error } = await (supabase as any)
+      .from("company_settings")
       .select("*")
       .limit(1)
       .single();
