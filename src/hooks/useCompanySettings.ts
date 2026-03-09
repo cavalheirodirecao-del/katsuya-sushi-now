@@ -13,6 +13,9 @@ export interface CompanySettings {
   instagram: string | null;
   facebook: string | null;
   opening_hours: string | null;
+  pix_key: string | null;
+  pix_name: string | null;
+  pix_bank: string | null;
 }
 
 const DEFAULT_SETTINGS: CompanySettings = {
@@ -27,6 +30,9 @@ const DEFAULT_SETTINGS: CompanySettings = {
   instagram: null,
   facebook: null,
   opening_hours: null,
+  pix_key: null,
+  pix_name: null,
+  pix_bank: null,
 };
 
 export const useCompanySettings = () => {

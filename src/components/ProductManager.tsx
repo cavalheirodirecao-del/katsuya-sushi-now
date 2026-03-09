@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ProductDB, useProductsDB } from "@/hooks/useProductsDB";
+import { CategoryDB } from "@/hooks/useCategories";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Switch } from "@/components/ui/switch";
@@ -13,19 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Plus, Pencil, Search, X, ImageIcon, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const CATEGORIES = [
-  { id: "combos", name: "Combos" },
-  { id: "porcoes", name: "Porções" },
-  { id: "bebidas", name: "Bebidas" },
-  { id: "sobremesas", name: "Sobremesas" },
-  { id: "frete", name: "Frete" },
-];
-
-const FILTER_CATEGORIES = [
-  { id: "all", name: "Todos" },
-  ...CATEGORIES,
-];
 
 interface ProductFormData {
   name: string;
@@ -54,9 +42,15 @@ interface Props {
   loading: boolean;
   updateProduct: (id: string, updates: Partial<ProductDB>) => Promise<boolean>;
   refresh: () => Promise<void>;
+  categories: CategoryDB[];
 }
 
-const ProductManager = ({ products, loading, updateProduct, refresh }: Props) => {
+const ProductManager = ({ products, loading, updateProduct, refresh, categories }: Props) => {
+  const getCategorySlug = (name: string) =>
+    name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "-").replace(/ç/g, "c");
+
+  const CATEGORIES = categories.map((c) => ({ id: getCategorySlug(c.name), name: c.name }));
+  const FILTER_CATEGORIES = [{ id: "all", name: "Todos" }, ...CATEGORIES];
   const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");

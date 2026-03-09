@@ -2,22 +2,25 @@ import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useProductsDB } from "@/hooks/useProductsDB";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
+import { useCategories } from "@/hooks/useCategories";
 import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { MapPin, Plus, BarChart3, Loader2, LogOut, Users, MapPinned, Clock, Package, Building2 } from "lucide-react";
+import { MapPin, Plus, BarChart3, Loader2, LogOut, Users, MapPinned, Clock, Package, Building2, Tag } from "lucide-react";
 import UserManagement from "@/components/UserManagement";
 import NeighborhoodManager from "@/components/NeighborhoodManager";
 import AuditLogViewer from "@/components/AuditLogViewer";
 import ProductManager from "@/components/ProductManager";
+import CategoryManager from "@/components/CategoryManager";
 import CompanySettings from "@/components/CompanySettings";
 
-type AdminTab = "products" | "zones" | "neighborhoods" | "users" | "audit" | "empresa";
+type AdminTab = "products" | "categories" | "zones" | "neighborhoods" | "users" | "audit" | "empresa";
 
 const Admin = () => {
   const { products, updateProduct, loading, refresh } = useProductsDB();
   const { zones, updateZone, addZone, origin } = useDeliveryZones();
+  const { categories, loading: catLoading, addCategory, updateCategory } = useCategories();
   const {
     user, isStaff, isMaster, loading: authLoading, signOut,
     canManageProducts, canManageZones, canManageNeighborhoods, canManageUsers,
@@ -49,6 +52,7 @@ const Admin = () => {
 
   const tabs: { id: AdminTab; label: string; icon: React.ReactNode; visible: boolean }[] = [
     { id: "products", label: "Produtos", icon: <Package className="h-4 w-4" />, visible: canManageProducts },
+    { id: "categories", label: "Categorias", icon: <Tag className="h-4 w-4" />, visible: canManageProducts },
     { id: "zones", label: "Zonas", icon: <MapPin className="h-4 w-4" />, visible: canManageZones },
     { id: "neighborhoods", label: "Bairros", icon: <MapPinned className="h-4 w-4" />, visible: canManageNeighborhoods },
     { id: "users", label: "Usuários", icon: <Users className="h-4 w-4" />, visible: canManageUsers },
@@ -95,7 +99,12 @@ const Admin = () => {
 
         {/* PRODUCTS TAB */}
         {tab === "products" && canManageProducts && (
-          <ProductManager products={products} loading={loading} updateProduct={updateProduct} refresh={refresh} />
+          <ProductManager products={products} loading={loading} updateProduct={updateProduct} refresh={refresh} categories={categories} />
+        )}
+
+        {/* CATEGORIES TAB */}
+        {tab === "categories" && canManageProducts && (
+          <CategoryManager categories={categories} loading={catLoading} addCategory={addCategory} updateCategory={updateCategory} />
         )}
 
         {/* ZONES TAB */}

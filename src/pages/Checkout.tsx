@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useNavigate } from "react-router-dom";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
+import { useNeighborhoodsDB } from "@/hooks/useNeighborhoodsDB";
 import { useCustomers, CustomerAddress } from "@/hooks/useCustomers";
 import { useOrdersDB, PaymentMethod } from "@/hooks/useOrdersDB";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
@@ -9,7 +10,8 @@ import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { OUT_OF_RANGE_MESSAGE } from "@/data/deliveryZones";
 import Header from "@/components/Header";
 import { toast } from "sonner";
-import { MessageCircle, Copy, User, MapPin, Plus, Check, Phone, Navigation, Loader2 } from "lucide-react";
+import { MessageCircle, Copy, User, MapPin, Plus, Check, Phone, Navigation, Loader2, AlertTriangle } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const formatPhone = (value: string) => {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -18,9 +20,12 @@ const formatPhone = (value: string) => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
+type DeliveryMode = "auto" | "manual";
+
 const Checkout = () => {
   const { items, total, clearCart } = useCart();
   const { calculateFee } = useDeliveryZones();
+  const { activeNeighborhoods, loading: neighbLoading } = useNeighborhoodsDB();
   const { currentCustomer, lookupByPhone, createOrUpdate, addAddress } = useCustomers();
   const { createOrder } = useOrdersDB();
   const { settings } = useCompanySettings();
@@ -40,10 +45,16 @@ const Checkout = () => {
   const [showNewAddress, setShowNewAddress] = useState(false);
   const [newAddress, setNewAddress] = useState({ label: "", street: "", number: "", neighborhood: "", reference: "" });
 
-  // Geolocation
+  // Delivery mode: auto (GPS) or manual (select neighborhood)
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("auto");
+
+  // Geolocation (auto mode)
   const [geoLoading, setGeoLoading] = useState(false);
   const [customerCoords, setCustomerCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [geoError, setGeoError] = useState("");
+
+  // Manual mode
+  const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState<string>("");
 
   // Payment
   const [payment, setPayment] = useState<PaymentMethod>("pix");
@@ -57,13 +68,26 @@ const Checkout = () => {
     return null;
   }, [selectedAddressId, currentCustomer]);
 
-  // Fee calculation based on geolocation
-  const feeResult = useMemo(() => {
+  // Fee calculation based on mode
+  const feeResultAuto = useMemo(() => {
     if (!customerCoords) return null;
     return calculateFee(customerCoords.lat, customerCoords.lng);
   }, [customerCoords, calculateFee]);
 
-  const deliveryFee = feeResult?.fee || 0;
+  const selectedNeighborhood = useMemo(() => {
+    if (!selectedNeighborhoodId) return null;
+    return activeNeighborhoods.find((n) => n.id === selectedNeighborhoodId) || null;
+  }, [selectedNeighborhoodId, activeNeighborhoods]);
+
+  // Unified fee
+  const deliveryFee = deliveryMode === "auto"
+    ? (feeResultAuto?.fee || 0)
+    : (selectedNeighborhood ? Number(selectedNeighborhood.fee) : 0);
+
+  const hasValidDelivery = deliveryMode === "auto"
+    ? !!feeResultAuto
+    : !!selectedNeighborhood;
+
   const grandTotal = total + deliveryFee;
 
   // Geolocation handler
@@ -103,6 +127,17 @@ const Checkout = () => {
     );
   };
 
+  const switchToManual = () => {
+    setDeliveryMode("manual");
+    setCustomerCoords(null);
+    setGeoError("");
+  };
+
+  const switchToAuto = () => {
+    setDeliveryMode("auto");
+    setSelectedNeighborhoodId("");
+  };
+
   // Phone lookup
   const handlePhoneLookup = async () => {
     const digits = phone.replace(/\D/g, "");
@@ -123,7 +158,11 @@ const Checkout = () => {
   };
 
   const handleAddNewAddress = async () => {
-    if (!newAddress.street || !newAddress.number || !newAddress.neighborhood) {
+    const addrNeighborhood = deliveryMode === "manual" && selectedNeighborhood
+      ? selectedNeighborhood.name
+      : newAddress.neighborhood;
+
+    if (!newAddress.street || !newAddress.number || !addrNeighborhood) {
       toast.error("Preencha rua, número e bairro!");
       return;
     }
@@ -136,15 +175,14 @@ const Checkout = () => {
     await createOrUpdate(digits, name);
 
     const success = await addAddress(digits, {
-      label: newAddress.label || newAddress.neighborhood,
+      label: newAddress.label || addrNeighborhood,
       street: newAddress.street,
       number: newAddress.number,
-      neighborhood: newAddress.neighborhood,
+      neighborhood: addrNeighborhood,
       reference: newAddress.reference,
     });
 
     if (success) {
-      // Refresh to get the new address with its DB id
       const updated = await lookupByPhone(digits);
       if (updated && updated.addresses.length > 0) {
         setSelectedAddressId(updated.addresses[0].id);
@@ -161,10 +199,14 @@ const Checkout = () => {
       return;
     }
 
+    const addrNeighborhood = deliveryMode === "manual" && selectedNeighborhood
+      ? selectedNeighborhood.name
+      : (selectedAddress?.neighborhood || newAddress.neighborhood);
+
     const finalAddress = selectedAddress || (showNewAddress ? {
       street: newAddress.street,
       number: newAddress.number,
-      neighborhood: newAddress.neighborhood,
+      neighborhood: addrNeighborhood,
       reference: newAddress.reference,
     } : null);
 
@@ -172,12 +214,8 @@ const Checkout = () => {
       toast.error("Selecione ou adicione um endereço!");
       return;
     }
-    if (!customerCoords) {
-      toast.error("Use sua localização para calcular o frete!");
-      return;
-    }
-    if (!feeResult) {
-      toast.error(OUT_OF_RANGE_MESSAGE);
+    if (!hasValidDelivery) {
+      toast.error("Selecione uma forma de cálculo de frete!");
       return;
     }
     if (items.length === 0) {
@@ -187,11 +225,9 @@ const Checkout = () => {
 
     setSubmitting(true);
 
-    // Save customer to localStorage
     const digits = phone.replace(/\D/g, "");
     createOrUpdate(digits, name);
 
-    // Save order to Supabase
     const orderItems = items.map((i) => ({
       productId: i.product.id,
       name: i.product.name,
@@ -231,6 +267,10 @@ const Checkout = () => {
     const paymentText =
       payment === "pix" ? "PIX — Vou enviar o comprovante." : `Dinheiro${changeFor ? ` — Troco para R$ ${changeFor}` : ""}`;
 
+    const deliveryInfo = deliveryMode === "auto" && feeResultAuto
+      ? `📍 Distância: ${feeResultAuto.distanceKm} km\n🛵 Zona: ${feeResultAuto.zone.zone}`
+      : `📍 Bairro: ${finalAddress.neighborhood}`;
+
     const message = `*Pedido ${settings.name}* 🍣
 *Nº ${order.order_number}*
 
@@ -242,8 +282,7 @@ ${finalAddress.street}, ${finalAddress.number}
 Bairro: ${finalAddress.neighborhood}
 ${finalAddress.reference ? `Ref: ${finalAddress.reference}` : ""}
 
-📍 Distância: ${feeResult.distanceKm} km
-🛵 Zona: ${feeResult.zone.zone}
+${deliveryInfo}
 
 *Pedido:*
 ${itemsText}
@@ -307,7 +346,7 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
           )}
         </div>
 
-        {/* STEP 2: Name + Address + Location */}
+        {/* STEP 2: Name + Location/Neighborhood + Address */}
         {step !== "phone" && (
           <>
             <div className="space-y-3 animate-fade-in">
@@ -322,37 +361,113 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
               />
             </div>
 
-            {/* Geolocation */}
+            {/* Delivery Mode: Auto (GPS) or Manual (Neighborhood) */}
             <div className="space-y-3 animate-fade-in">
               <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Navigation className="h-4 w-4 text-primary" /> Sua Localização
+                <Navigation className="h-4 w-4 text-primary" /> Cálculo do Frete
               </h2>
-              <button
-                onClick={handleGetLocation}
-                disabled={geoLoading}
-                className="w-full bg-secondary border border-border rounded-lg py-3 flex items-center justify-center gap-2 text-sm text-foreground hover:border-primary/50 transition-colors disabled:opacity-50"
-              >
-                {geoLoading ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" /> Obtendo localização...</>
-                ) : customerCoords ? (
-                  <><Check className="h-4 w-4 text-primary" /> Localização obtida — Atualizar</>
-                ) : (
-                  <><Navigation className="h-4 w-4" /> Usar minha localização</>
-                )}
-              </button>
-              {geoError && <p className="text-xs text-destructive">{geoError}</p>}
-              {customerCoords && feeResult && (
-                <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
-                  <p className="text-sm font-bold text-primary">
-                    📍 {feeResult.distanceKm} km — 🛵 Frete: R$ {feeResult.fee.toFixed(2)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">Zona: {feeResult.zone.zone} — {feeResult.zone.description}</p>
+
+              {/* Mode toggle */}
+              <div className="flex gap-2">
+                <button
+                  onClick={switchToAuto}
+                  className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                    deliveryMode === "auto"
+                      ? "gradient-red text-primary-foreground border-primary"
+                      : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
+                  }`}
+                >
+                  📍 Localização Automática
+                </button>
+                <button
+                  onClick={switchToManual}
+                  className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                    deliveryMode === "manual"
+                      ? "gradient-red text-primary-foreground border-primary"
+                      : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
+                  }`}
+                >
+                  🏘️ Selecionar Bairro
+                </button>
+              </div>
+
+              {/* AUTO MODE */}
+              {deliveryMode === "auto" && (
+                <div className="space-y-3">
+                  <button
+                    onClick={handleGetLocation}
+                    disabled={geoLoading}
+                    className="w-full bg-secondary border border-border rounded-lg py-3 flex items-center justify-center gap-2 text-sm text-foreground hover:border-primary/50 transition-colors disabled:opacity-50"
+                  >
+                    {geoLoading ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Obtendo localização...</>
+                    ) : customerCoords ? (
+                      <><Check className="h-4 w-4 text-primary" /> Localização obtida — Atualizar</>
+                    ) : (
+                      <><Navigation className="h-4 w-4" /> Usar minha localização</>
+                    )}
+                  </button>
+                  {geoError && <p className="text-xs text-destructive">{geoError}</p>}
+                  {customerCoords && feeResultAuto && (
+                    <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                      <p className="text-sm font-bold text-primary">
+                        📍 {feeResultAuto.distanceKm} km — 🛵 Frete: R$ {feeResultAuto.fee.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">Zona: {feeResultAuto.zone.zone} — {feeResultAuto.zone.description}</p>
+                    </div>
+                  )}
+                  {customerCoords && !feeResultAuto && (
+                    <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                      <p className="text-sm font-bold text-destructive">❌ {OUT_OF_RANGE_MESSAGE}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Distância máxima: 5 km</p>
+                    </div>
+                  )}
+
+                  {/* Hint to switch to manual */}
+                  <button
+                    onClick={switchToManual}
+                    className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Localização veio errada? Selecione seu bairro manualmente
+                  </button>
                 </div>
               )}
-              {customerCoords && !feeResult && (
-                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-                  <p className="text-sm font-bold text-destructive">❌ {OUT_OF_RANGE_MESSAGE}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Distância máxima: 5 km</p>
+
+              {/* MANUAL MODE */}
+              {deliveryMode === "manual" && (
+                <div className="space-y-3">
+                  <Select value={selectedNeighborhoodId} onValueChange={setSelectedNeighborhoodId}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione seu bairro" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeNeighborhoods.map((n) => (
+                        <SelectItem key={n.id} value={n.id}>
+                          {n.name} — R$ {Number(n.fee).toFixed(2)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {selectedNeighborhood && (
+                    <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                      <p className="text-sm font-bold text-primary">
+                        🏘️ {selectedNeighborhood.name} — 🛵 Frete: R$ {Number(selectedNeighborhood.fee).toFixed(2)}
+                      </p>
+                      {selectedNeighborhood.zone && (
+                        <p className="text-xs text-muted-foreground mt-1">Zona: {selectedNeighborhood.zone}</p>
+                      )}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={switchToAuto}
+                    className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Navigation className="h-3.5 w-3.5" />
+                    Usar localização automática
+                  </button>
                 </div>
               )}
             </div>
@@ -424,12 +539,21 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
                     value={newAddress.number}
                     onChange={(e) => setNewAddress((p) => ({ ...p, number: e.target.value }))}
                   />
-                  <input
-                    className={inputClass}
-                    placeholder="Bairro *"
-                    value={newAddress.neighborhood}
-                    onChange={(e) => setNewAddress((p) => ({ ...p, neighborhood: e.target.value }))}
-                  />
+
+                  {/* Neighborhood: auto-filled in manual mode, free text in auto mode */}
+                  {deliveryMode === "manual" && selectedNeighborhood ? (
+                    <div className="bg-secondary border border-border rounded-lg px-4 py-3 text-sm text-foreground opacity-70">
+                      Bairro: {selectedNeighborhood.name}
+                    </div>
+                  ) : (
+                    <input
+                      className={inputClass}
+                      placeholder="Bairro *"
+                      value={newAddress.neighborhood}
+                      onChange={(e) => setNewAddress((p) => ({ ...p, neighborhood: e.target.value }))}
+                    />
+                  )}
+
                   <input
                     className={inputClass}
                     placeholder="Ponto de referência (opcional)"
@@ -477,22 +601,31 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
               {payment === "pix" && (
                 <div className="bg-card border border-border rounded-lg p-4 space-y-2">
                   <p className="text-sm font-bold text-foreground">Dados PIX</p>
-                  <div className="flex items-center justify-between bg-secondary rounded-lg px-3 py-2">
-                    <div>
-                      <p className="text-xs text-muted-foreground">CNPJ</p>
-                      <p className="text-sm font-mono text-foreground">27.810857000123</p>
+                  {settings.pix_key && (
+                    <div className="flex items-center justify-between bg-secondary rounded-lg px-3 py-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Chave PIX</p>
+                        <p className="text-sm font-mono text-foreground">{settings.pix_key}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(settings.pix_key || "");
+                          toast.success("Chave PIX copiada!");
+                        }}
+                      >
+                        <Copy className="h-4 w-4 text-muted-foreground" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText("27810857000123");
-                        toast.success("CNPJ copiado!");
-                      }}
-                    >
-                      <Copy className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Banco do Brasil</p>
-                  <p className="text-xs text-muted-foreground">Rafaela Silva de Freitas</p>
+                  )}
+                  {settings.pix_bank && (
+                    <p className="text-xs text-muted-foreground">{settings.pix_bank}</p>
+                  )}
+                  {settings.pix_name && (
+                    <p className="text-xs text-muted-foreground">{settings.pix_name}</p>
+                  )}
+                  {!settings.pix_key && (
+                    <p className="text-xs text-muted-foreground">Dados PIX não configurados. Entre em contato com o restaurante.</p>
+                  )}
                   <p className="text-xs text-primary mt-2">
                     Após realizar o pagamento, envie o comprovante para confirmar seu pedido.
                   </p>
@@ -528,7 +661,7 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Taxa de entrega</span>
                   <span className="text-foreground">
-                    {feeResult ? `R$ ${deliveryFee.toFixed(2)}` : customerCoords ? "Fora da área" : "Use sua localização"}
+                    {hasValidDelivery ? `R$ ${deliveryFee.toFixed(2)}` : "Selecione o frete"}
                   </span>
                 </div>
                 <div className="border-t border-border pt-2 flex justify-between font-bold">
@@ -541,7 +674,7 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
             {/* Submit */}
             <button
               onClick={handleSubmit}
-              disabled={!feeResult || submitting}
+              disabled={!hasValidDelivery || submitting}
               className="w-full gradient-red text-primary-foreground py-4 rounded-full font-bold text-base flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-95 disabled:opacity-50"
             >
               {submitting ? (
