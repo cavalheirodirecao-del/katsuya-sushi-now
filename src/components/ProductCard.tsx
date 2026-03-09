@@ -1,5 +1,5 @@
-import { Plus } from "lucide-react";
-import { Product } from "@/data/products";
+import { Plus, AlertCircle } from "lucide-react";
+import { Product } from "@/hooks/useProductsDB";
 import { useCart } from "@/contexts/CartContext";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -12,7 +12,13 @@ const ProductCard = ({ product }: Props) => {
   const { addItem } = useCart();
   const [selectedFlavor, setSelectedFlavor] = useState(product.flavors?.[0] || "");
 
+  const isOutOfStock = product.stock === 0;
+
   const handleAdd = () => {
+    if (isOutOfStock) {
+      toast.error("Produto esgotado!");
+      return;
+    }
     addItem(product, selectedFlavor || undefined);
     toast.success(`${product.name} adicionado ao carrinho!`);
   };
@@ -30,6 +36,13 @@ const ProductCard = ({ product }: Props) => {
           <div className="absolute top-2 right-2 bg-primary text-primary-foreground text-sm font-bold px-3 py-1 rounded-full shadow-lg">
             R$ {product.price.toFixed(2)}
           </div>
+          {isOutOfStock && (
+            <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+              <span className="flex items-center gap-2 bg-destructive text-destructive-foreground px-3 py-1.5 rounded-full text-sm font-bold">
+                <AlertCircle className="h-4 w-4" /> Esgotado
+              </span>
+            </div>
+          )}
         </div>
       )}
       <div className="p-4 flex flex-col gap-2">
@@ -65,10 +78,11 @@ const ProductCard = ({ product }: Props) => {
 
         <button
           onClick={handleAdd}
-          className="mt-2 gradient-red text-primary-foreground rounded-lg py-2.5 flex items-center justify-center gap-2 font-medium text-sm hover:opacity-90 transition-opacity active:scale-95"
+          disabled={isOutOfStock}
+          className="mt-2 gradient-red text-primary-foreground rounded-lg py-2.5 flex items-center justify-center gap-2 font-medium text-sm hover:opacity-90 transition-opacity active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus className="h-4 w-4" />
-          Adicionar
+          {isOutOfStock ? "Esgotado" : "Adicionar"}
         </button>
       </div>
     </div>
