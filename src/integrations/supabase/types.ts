@@ -14,6 +14,107 @@ export type Database = {
   }
   public: {
     Tables: {
+      customer_addresses: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          label: string
+          neighborhood: string
+          number: string
+          reference: string | null
+          street: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          label?: string
+          neighborhood: string
+          number: string
+          reference?: string | null
+          street: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          label?: string
+          neighborhood?: string
+          number?: string
+          reference?: string | null
+          street?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_addresses_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customers: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          phone: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          phone: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          phone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      delivery_zones: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          fee: number
+          id: string
+          max_distance_km: number
+          sort_order: number
+          updated_at: string
+          zone: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          fee: number
+          id?: string
+          max_distance_km: number
+          sort_order?: number
+          updated_at?: string
+          zone: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          fee?: number
+          id?: string
+          max_distance_km?: number
+          sort_order?: number
+          updated_at?: string
+          zone?: string
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string
