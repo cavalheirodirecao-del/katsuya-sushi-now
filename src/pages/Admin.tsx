@@ -15,7 +15,7 @@ import ProductManager from "@/components/ProductManager";
 type AdminTab = "products" | "zones" | "neighborhoods" | "users" | "audit";
 
 const Admin = () => {
-  const { products, updateProduct, loading } = useProductsDB();
+  const { products, updateProduct, loading, refresh } = useProductsDB();
   const { zones, updateZone, addZone, origin } = useDeliveryZones();
   const {
     user, isStaff, isMaster, loading: authLoading, signOut,
