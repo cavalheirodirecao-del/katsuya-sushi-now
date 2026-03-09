@@ -181,15 +181,14 @@ const Admin = () => {
               <input className={inputClass} placeholder="Taxa de entrega (R$)" type="number" value={newFee} onChange={(e) => setNewFee(e.target.value)} />
               <input className={inputClass} placeholder="Descrição (bairros cobertos)" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (!newZoneName || !newMaxDist || !newFee) {
                     toast.error("Preencha nome, distância e taxa!");
                     return;
                   }
-                  addZone({
-                    id: `zona-${Date.now()}`,
+                  await addZone({
                     zone: newZoneName,
-                    maxDistanceKm: parseFloat(newMaxDist),
+                    max_distance_km: parseFloat(newMaxDist),
                     fee: parseFloat(newFee),
                     description: newDesc,
                     active: true,
