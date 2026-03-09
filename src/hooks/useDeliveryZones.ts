@@ -1,65 +1,126 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
-  DeliveryZone,
-  defaultDeliveryZones,
   deliveryOrigin,
   haversineDistance,
   MAX_DELIVERY_DISTANCE_KM,
 } from "@/data/deliveryZones";
 
-const STORAGE_KEY = "katsuya-delivery-zones";
+export interface DeliveryZoneDB {
+  id: string;
+  zone: string;
+  max_distance_km: number;
+  fee: number;
+  description: string;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
 
 export const useDeliveryZones = () => {
-  const [zones, setZones] = useState<DeliveryZone[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Migration: if old format (has neighborhood field), reset to new defaults
-        if (parsed.length > 0 && "neighborhood" in parsed[0]) {
-          return defaultDeliveryZones;
-        }
-        return parsed;
-      } catch {
-        return defaultDeliveryZones;
-      }
+  const [zones, setZones] = useState<DeliveryZoneDB[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchZones = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("delivery_zones")
+      .select("*")
+      .order("max_distance_km", { ascending: true });
+
+    if (error) {
+      console.error("Error fetching delivery zones:", error);
+      setLoading(false);
+      return;
     }
-    return defaultDeliveryZones;
-  });
+
+    setZones((data || []) as DeliveryZoneDB[]);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(zones));
-  }, [zones]);
+    fetchZones();
+  }, [fetchZones]);
 
-  const activeZones = zones.filter((z) => z.active).sort((a, b) => a.maxDistanceKm - b.maxDistanceKm);
+  const activeZones = zones
+    .filter((z) => z.active)
+    .sort((a, b) => Number(a.max_distance_km) - Number(b.max_distance_km));
 
-  /**
-   * Given customer coordinates, find the matching zone and fee.
-   * Returns { zone, fee, distanceKm } or null if out of range.
-   */
   const calculateFee = (customerLat: number, customerLng: number) => {
     const dist = haversineDistance(deliveryOrigin.lat, deliveryOrigin.lng, customerLat, customerLng);
     if (dist > MAX_DELIVERY_DISTANCE_KM) return null;
 
     for (const z of activeZones) {
-      if (dist <= z.maxDistanceKm) {
-        return { zone: z, fee: z.fee, distanceKm: Math.round(dist * 10) / 10 };
+      if (dist <= Number(z.max_distance_km)) {
+        return {
+          zone: { zone: z.zone, description: z.description },
+          fee: Number(z.fee),
+          distanceKm: Math.round(dist * 10) / 10,
+        };
       }
     }
     return null;
   };
 
-  const updateZone = (id: string, updates: Partial<DeliveryZone>) => {
-    setZones((prev) => prev.map((z) => (z.id === id ? { ...z, ...updates } : z)));
+  const updateZone = async (id: string, updates: Partial<DeliveryZoneDB>) => {
+    const { error } = await supabase
+      .from("delivery_zones")
+      .update(updates)
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error updating zone:", error);
+      return false;
+    }
+
+    await fetchZones();
+    return true;
   };
 
-  const addZone = (zone: DeliveryZone) => {
-    setZones((prev) => [...prev, zone]);
+  const addZone = async (zone: {
+    zone: string;
+    max_distance_km: number;
+    fee: number;
+    description: string;
+    active: boolean;
+  }) => {
+    const { error } = await supabase
+      .from("delivery_zones")
+      .insert(zone);
+
+    if (error) {
+      console.error("Error adding zone:", error);
+      return false;
+    }
+
+    await fetchZones();
+    return true;
   };
 
-  const removeZone = (id: string) => {
-    setZones((prev) => prev.filter((z) => z.id !== id));
+  const removeZone = async (id: string) => {
+    const { error } = await supabase
+      .from("delivery_zones")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error("Error removing zone:", error);
+      return false;
+    }
+
+    await fetchZones();
+    return true;
   };
 
-  return { zones, activeZones, calculateFee, updateZone, addZone, removeZone, origin: deliveryOrigin };
+  return {
+    zones,
+    activeZones,
+    loading,
+    calculateFee,
+    updateZone,
+    addZone,
+    removeZone,
+    origin: deliveryOrigin,
+    refresh: fetchZones,
+  };
 };
