@@ -256,7 +256,8 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
 *Pagamento:* ${paymentText}`;
 
     const encoded = encodeURIComponent(message);
-    window.open(`https://wa.me/5581982522785?text=${encoded}`, "_blank");
+    const whatsappPhone = settings.phone.replace(/\D/g, "");
+    window.open(`https://wa.me/${whatsappPhone}?text=${encoded}`, "_blank");
     clearCart();
     navigate("/");
     toast.success("Pedido enviado! Verifique o WhatsApp.");

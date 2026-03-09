@@ -6,13 +6,16 @@ import logo from "@/assets/logo.png";
 
 const Header = () => {
   const { itemCount } = useCart();
+  const { settings } = useCompanySettings();
 
   return (
     <header className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-border">
       <div className="container flex items-center justify-between h-14">
         <Link to="/" className="flex items-center gap-2">
-          <img src={logo} alt="Katsuya" className="h-9 w-9 rounded-full object-cover" />
-          <span className="font-display text-sm font-bold tracking-wide text-foreground">KATSUYA</span>
+          <img src={settings.logo_url || logo} alt={settings.name} className="h-9 w-9 rounded-full object-cover" />
+          <span className="font-display text-sm font-bold tracking-wide text-foreground">
+            {settings.name.toUpperCase().split(" ")[0] || "KATSUYA"}
+          </span>
         </Link>
         <div className="flex items-center gap-3">
           <Link to="/dashboard" className="p-2 text-muted-foreground hover:text-foreground transition-colors" title="Dashboard">

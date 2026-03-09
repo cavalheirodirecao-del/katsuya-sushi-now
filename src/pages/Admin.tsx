@@ -161,6 +161,9 @@ const Admin = () => {
         {/* USERS TAB */}
         {tab === "users" && canManageUsers && <UserManagement />}
 
+        {/* EMPRESA TAB */}
+        {tab === "empresa" && isMaster && <CompanySettings />}
+
         {/* AUDIT LOG TAB */}
         {tab === "audit" && isMaster && <AuditLogViewer />}
       </div>
