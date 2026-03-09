@@ -102,13 +102,13 @@ const Checkout = () => {
   };
 
   // Phone lookup
-  const handlePhoneLookup = () => {
+  const handlePhoneLookup = async () => {
     const digits = phone.replace(/\D/g, "");
     if (digits.length < 10 || digits.length > 11) {
       toast.error("Telefone inválido! Use DDD + 9 dígitos.");
       return;
     }
-    const found = lookupByPhone(digits);
+    const found = await lookupByPhone(digits);
     if (found) {
       setName(found.name);
       toast.success(`Bem-vindo de volta, ${found.name}! 🎉`);
