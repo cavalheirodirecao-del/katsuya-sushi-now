@@ -3,7 +3,6 @@ import { Link, Navigate } from "react-router-dom";
 import { useProductsDB } from "@/hooks/useProductsDB";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
 import { useAuth } from "@/hooks/useAuth";
-import { categories } from "@/data/products";
 import Header from "@/components/Header";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -11,6 +10,7 @@ import { MapPin, Plus, BarChart3, Loader2, LogOut, Users, MapPinned, Clock, Pack
 import UserManagement from "@/components/UserManagement";
 import NeighborhoodManager from "@/components/NeighborhoodManager";
 import AuditLogViewer from "@/components/AuditLogViewer";
+import ProductManager from "@/components/ProductManager";
 
 type AdminTab = "products" | "zones" | "neighborhoods" | "users" | "audit";
 
