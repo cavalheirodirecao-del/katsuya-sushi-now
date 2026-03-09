@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useProducts } from "@/hooks/useProducts";
+import { useProductsDB } from "@/hooks/useProductsDB";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
 import { categories } from "@/data/products";
 import Header from "@/components/Header";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Lock, MapPin, Plus, Trash2, BarChart3 } from "lucide-react";
+import { Lock, MapPin, Plus, Trash2, BarChart3, Loader2 } from "lucide-react";
 
 const ADMIN_PASS = "katsuya2024";
 
