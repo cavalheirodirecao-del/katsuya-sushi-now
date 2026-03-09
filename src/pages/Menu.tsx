@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Settings } from "lucide-react";
+import { Settings, Loader2 } from "lucide-react";
 import { categories } from "@/data/products";
-import { useProducts } from "@/hooks/useProducts";
+import { useProductsDB } from "@/hooks/useProductsDB";
 import ProductCard from "@/components/ProductCard";
 import Header from "@/components/Header";
 
 const Menu = () => {
   const [activeCategory, setActiveCategory] = useState("combos");
-  const { getByCategory } = useProducts();
+  const { getByCategory, loading } = useProductsDB();
   const items = getByCategory(activeCategory);
+
+  // Filter out "frete" category from menu tabs
+  const menuCategories = categories.filter((c) => c.id !== "frete");
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -18,7 +21,7 @@ const Menu = () => {
       {/* Category tabs */}
       <div className="sticky top-14 z-40 bg-background/90 backdrop-blur-md border-b border-border">
         <div className="container flex gap-1 overflow-x-auto py-3 scrollbar-hide">
-          {categories.map((cat) => (
+          {menuCategories.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setActiveCategory(cat.id)}
@@ -37,7 +40,11 @@ const Menu = () => {
 
       {/* Products */}
       <div className="container mt-4 space-y-3">
-        {items.length === 0 ? (
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : items.length === 0 ? (
           <p className="text-muted-foreground text-center py-10">Nenhum item disponível nesta categoria.</p>
         ) : (
           items.map((product) => (
