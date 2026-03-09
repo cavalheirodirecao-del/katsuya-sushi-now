@@ -6,13 +6,14 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { MapPin, Plus, BarChart3, Loader2, LogOut, Users, MapPinned, Clock, Package } from "lucide-react";
+import { MapPin, Plus, BarChart3, Loader2, LogOut, Users, MapPinned, Clock, Package, Building2 } from "lucide-react";
 import UserManagement from "@/components/UserManagement";
 import NeighborhoodManager from "@/components/NeighborhoodManager";
 import AuditLogViewer from "@/components/AuditLogViewer";
 import ProductManager from "@/components/ProductManager";
+import CompanySettings from "@/components/CompanySettings";
 
-type AdminTab = "products" | "zones" | "neighborhoods" | "users" | "audit";
+type AdminTab = "products" | "zones" | "neighborhoods" | "users" | "audit" | "empresa";
 
 const Admin = () => {
   const { products, updateProduct, loading, refresh } = useProductsDB();
@@ -51,6 +52,7 @@ const Admin = () => {
     { id: "zones", label: "Zonas", icon: <MapPin className="h-4 w-4" />, visible: canManageZones },
     { id: "neighborhoods", label: "Bairros", icon: <MapPinned className="h-4 w-4" />, visible: canManageNeighborhoods },
     { id: "users", label: "Usuários", icon: <Users className="h-4 w-4" />, visible: canManageUsers },
+    { id: "empresa", label: "Empresa", icon: <Building2 className="h-4 w-4" />, visible: isMaster },
     { id: "audit", label: "Histórico", icon: <Clock className="h-4 w-4" />, visible: isMaster },
   ];
 
