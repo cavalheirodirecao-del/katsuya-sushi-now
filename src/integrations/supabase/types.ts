@@ -66,6 +66,9 @@ export type Database = {
           name: string
           opening_hours: string | null
           phone: string
+          pix_bank: string | null
+          pix_key: string | null
+          pix_name: string | null
           state: string | null
           updated_at: string
         }
@@ -81,6 +84,9 @@ export type Database = {
           name?: string
           opening_hours?: string | null
           phone?: string
+          pix_bank?: string | null
+          pix_key?: string | null
+          pix_name?: string | null
           state?: string | null
           updated_at?: string
         }
@@ -96,6 +102,9 @@ export type Database = {
           name?: string
           opening_hours?: string | null
           phone?: string
+          pix_bank?: string | null
+          pix_key?: string | null
+          pix_name?: string | null
           state?: string | null
           updated_at?: string
         }
