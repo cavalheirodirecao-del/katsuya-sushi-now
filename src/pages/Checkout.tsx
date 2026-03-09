@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
 import { useCustomers, CustomerAddress } from "@/hooks/useCustomers";
 import { useOrdersDB, PaymentMethod } from "@/hooks/useOrdersDB";
-import { CustomerAddress as _unused } from "@/data/customer";
+
 import { OUT_OF_RANGE_MESSAGE } from "@/data/deliveryZones";
 import Header from "@/components/Header";
 import { toast } from "sonner";
