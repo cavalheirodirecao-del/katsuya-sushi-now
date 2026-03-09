@@ -51,8 +51,8 @@ export const useCompanySettings = () => {
   }, [fetchSettings]);
 
   const updateSettings = async (updates: Partial<CompanySettings>) => {
-    const { error } = await supabase
-      .from("company_settings" as any)
+    const { error } = await (supabase as any)
+      .from("company_settings")
       .update(updates)
       .eq("id", settings.id);
 
