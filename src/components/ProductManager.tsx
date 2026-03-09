@@ -45,7 +45,12 @@ interface Props {
   categories: CategoryDB[];
 }
 
-const ProductManager = ({ products, loading, updateProduct, refresh }: Props) => {
+const ProductManager = ({ products, loading, updateProduct, refresh, categories }: Props) => {
+  const getCategorySlug = (name: string) =>
+    name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "-").replace(/ç/g, "c");
+
+  const CATEGORIES = categories.map((c) => ({ id: getCategorySlug(c.name), name: c.name }));
+  const FILTER_CATEGORIES = [{ id: "all", name: "Todos" }, ...CATEGORIES];
   const { user } = useAuth();
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("all");
