@@ -11,6 +11,7 @@ import Checkout from "./pages/Checkout";
 import Admin from "./pages/Admin";
 import Dashboard from "./pages/Dashboard";
 import ProductForm from "./pages/ProductForm";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/cardapio" element={<Menu />} />
             <Route path="/carrinho" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
+            <Route path="/login" element={<Login />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/produtos/novo" element={<ProductForm />} />
