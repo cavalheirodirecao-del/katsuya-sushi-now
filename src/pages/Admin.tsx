@@ -11,7 +11,7 @@ import { Lock, MapPin, Plus, Trash2, BarChart3, Loader2 } from "lucide-react";
 const ADMIN_PASS = "katsuya2024";
 
 const Admin = () => {
-  const { products, updateProduct } = useProducts();
+  const { products, updateProduct, loading } = useProductsDB();
   const { zones, updateZone, addZone, removeZone, origin } = useDeliveryZones();
   const [auth, setAuth] = useState(false);
   const [pass, setPass] = useState("");
