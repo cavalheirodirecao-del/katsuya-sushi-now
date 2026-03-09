@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useNavigate } from "react-router-dom";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
-import { useCustomers } from "@/hooks/useCustomers";
+import { useCustomers, CustomerAddress } from "@/hooks/useCustomers";
 import { useOrdersDB, PaymentMethod } from "@/hooks/useOrdersDB";
 import { CustomerAddress } from "@/data/customer";
 import { OUT_OF_RANGE_MESSAGE } from "@/data/deliveryZones";
