@@ -221,7 +221,7 @@ const Admin = () => {
                           value={editPrice}
                           onChange={(e) => setEditPrice(e.target.value)}
                           onBlur={() => {
-                            updateZone(z.id, { fee: parseFloat(editPrice) || z.fee });
+                            updateZone(z.id, { fee: parseFloat(editPrice) || Number(z.fee) });
                             setEditingId(null);
                             toast.success("Taxa atualizada!");
                           }}
