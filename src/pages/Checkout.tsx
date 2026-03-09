@@ -3,12 +3,12 @@ import { useCart } from "@/contexts/CartContext";
 import { useNavigate } from "react-router-dom";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
 import { useCustomers } from "@/hooks/useCustomers";
+import { useOrdersDB, PaymentMethod } from "@/hooks/useOrdersDB";
 import { CustomerAddress } from "@/data/customer";
-import { createOrderFromCheckout, saveOrder } from "@/data/orders";
 import { OUT_OF_RANGE_MESSAGE } from "@/data/deliveryZones";
 import Header from "@/components/Header";
 import { toast } from "sonner";
-import { MessageCircle, Copy, ChevronDown, User, MapPin, Plus, Check, Phone, Navigation, Loader2 } from "lucide-react";
+import { MessageCircle, Copy, User, MapPin, Plus, Check, Phone, Navigation, Loader2 } from "lucide-react";
 
 const formatPhone = (value: string) => {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -21,10 +21,12 @@ const Checkout = () => {
   const { items, total, clearCart } = useCart();
   const { calculateFee } = useDeliveryZones();
   const { currentCustomer, lookupByPhone, createOrUpdate, addAddress } = useCustomers();
+  const { createOrder } = useOrdersDB();
   const navigate = useNavigate();
 
   // Step management
   const [step, setStep] = useState<"phone" | "details" | "payment">("phone");
+  const [submitting, setSubmitting] = useState(false);
 
   // Phone step
   const [phone, setPhone] = useState("");
@@ -42,7 +44,7 @@ const Checkout = () => {
   const [geoError, setGeoError] = useState("");
 
   // Payment
-  const [payment, setPayment] = useState<"pix" | "dinheiro">("pix");
+  const [payment, setPayment] = useState<PaymentMethod>("pix");
   const [changeFor, setChangeFor] = useState("");
 
   // Derived
@@ -147,7 +149,7 @@ const Checkout = () => {
     toast.success("Endereço salvo! ✅");
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name) {
       toast.error("Informe seu nome!");
       return;
@@ -177,16 +179,45 @@ const Checkout = () => {
       return;
     }
 
-    // Save customer
+    setSubmitting(true);
+
+    // Save customer to localStorage
     const digits = phone.replace(/\D/g, "");
     createOrUpdate(digits, name);
 
-    // Save order
-    const order = createOrderFromCheckout(
-      name, digits, finalAddress as any, items, total, deliveryFee, grandTotal, payment
-    );
-    saveOrder(order);
+    // Save order to Supabase
+    const orderItems = items.map((i) => ({
+      productId: i.product.id,
+      name: i.product.name,
+      quantity: i.quantity,
+      price: i.product.price,
+      flavor: i.flavor,
+      notes: i.notes,
+    }));
 
+    const order = await createOrder(
+      name,
+      digits,
+      {
+        street: finalAddress.street,
+        number: finalAddress.number,
+        neighborhood: finalAddress.neighborhood,
+        reference: finalAddress.reference,
+      },
+      orderItems,
+      total,
+      deliveryFee,
+      grandTotal,
+      payment
+    );
+
+    if (!order) {
+      setSubmitting(false);
+      toast.error("Erro ao criar pedido. Tente novamente.");
+      return;
+    }
+
+    // Build WhatsApp message
     const itemsText = items
       .map((i) => `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}${i.notes ? `\n   _Obs: ${i.notes}_` : ""}`)
       .join("\n");
@@ -195,6 +226,7 @@ const Checkout = () => {
       payment === "pix" ? "PIX — Vou enviar o comprovante." : `Dinheiro${changeFor ? ` — Troco para R$ ${changeFor}` : ""}`;
 
     const message = `*Pedido Katsuya Sushi* 🍣
+*Nº ${order.order_number}*
 
 *Nome:* ${name}
 *Telefone:* ${formatPhone(digits)}
@@ -502,11 +534,14 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
             {/* Submit */}
             <button
               onClick={handleSubmit}
-              disabled={!feeResult}
+              disabled={!feeResult || submitting}
               className="w-full gradient-red text-primary-foreground py-4 rounded-full font-bold text-base flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-95 disabled:opacity-50"
             >
-              <MessageCircle className="h-5 w-5" />
-              Enviar Pedido no WhatsApp
+              {submitting ? (
+                <><Loader2 className="h-5 w-5 animate-spin" /> Enviando...</>
+              ) : (
+                <><MessageCircle className="h-5 w-5" /> Enviar Pedido no WhatsApp</>
+              )}
             </button>
           </>
         )}
