@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from "react";
+import { Navigate } from "react-router-dom";
 import { useOrdersDB, OrderDB, OrderStatus } from "@/hooks/useOrdersDB";
 import { useProductsDB } from "@/hooks/useProductsDB";
+import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { OrderKanban } from "@/components/OrderKanban";
 import { StockManager } from "@/components/StockManager";
 import { toast } from "sonner";
-import { Lock, TrendingUp, ShoppingBag, Users, MapPin, CreditCard, Download, BarChart3, Package, Crown, Bell, BellOff, Boxes, Loader2 } from "lucide-react";
+import { TrendingUp, ShoppingBag, Users, MapPin, CreditCard, Download, BarChart3, Package, Crown, Bell, BellOff, Boxes, Loader2, LogOut } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { format, parseISO } from "date-fns";
-
-const ADMIN_PASS = "katsuya2024";
 
 // Generate notification sound using Web Audio API
 const playNotificationSound = () => {
@@ -46,8 +46,7 @@ const playNotificationSound = () => {
 };
 
 const Dashboard = () => {
-  const [auth, setAuth] = useState(false);
-  const [pass, setPass] = useState("");
+  const { user, isStaff, loading: authLoading, signOut, canManageProducts } = useAuth();
   const [tab, setTab] = useState<"kanban" | "dashboard" | "pedidos" | "estoque" | "clientes" | "bairros" | "pagamentos">("kanban");
   const [chartDays, setChartDays] = useState(7);
   const [orderFilter, setOrderFilter] = useState<"hoje" | "ontem" | "7dias" | "mes">("hoje");
@@ -69,7 +68,7 @@ const Dashboard = () => {
   const lastOrderCountRef = useRef(orders.length);
 
   useEffect(() => {
-    if (!auth || ordersLoading) return;
+    if (!isStaff || ordersLoading) return;
 
     if (orders.length > lastOrderCountRef.current) {
       const newCount = orders.length - lastOrderCountRef.current;
@@ -79,7 +78,7 @@ const Dashboard = () => {
       toast.success(`🔔 ${newCount} novo(s) pedido(s)!`, { duration: 5000 });
     }
     lastOrderCountRef.current = orders.length;
-  }, [auth, soundEnabled, orders.length, ordersLoading]);
+  }, [isStaff, soundEnabled, orders.length, ordersLoading]);
 
   const handleStatusChange = async (id: string, status: OrderStatus) => {
     const success = await updateStatus(id, status);
@@ -90,26 +89,16 @@ const Dashboard = () => {
     }
   };
 
-  if (!auth) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="bg-card border border-border rounded-xl p-6 w-80 space-y-4">
-          <Lock className="h-8 w-8 text-primary mx-auto" />
-          <h1 className="font-display text-lg font-bold text-foreground text-center">Dashboard Admin</h1>
-          <input
-            type="password"
-            className="w-full bg-secondary border border-border rounded-lg px-4 py-3 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            placeholder="Senha"
-            value={pass}
-            onChange={(e) => setPass(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") { if (pass === ADMIN_PASS) setAuth(true); else toast.error("Senha incorreta"); } }}
-          />
-          <button onClick={() => { if (pass === ADMIN_PASS) setAuth(true); else toast.error("Senha incorreta"); }} className="w-full gradient-red text-primary-foreground py-3 rounded-lg font-bold">
-            Entrar
-          </button>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (!user || !isStaff) {
+    return <Navigate to="/login" replace />;
   }
 
   const filteredOrders = orderFilter === "hoje" ? ordersToday : orderFilter === "ontem" ? ordersYesterday : orderFilter === "7dias" ? ordersLast7 : ordersThisMonth;
@@ -144,7 +133,7 @@ const Dashboard = () => {
 
   const tabs = [
     { id: "kanban" as const, label: "📋 Pedidos", icon: ShoppingBag, badge: pendingCount },
-    { id: "estoque" as const, label: "📦 Estoque", icon: Boxes, badge: outOfStockCount > 0 ? outOfStockCount : lowStockCount },
+    ...(canManageProducts ? [{ id: "estoque" as const, label: "📦 Estoque", icon: Boxes, badge: outOfStockCount > 0 ? outOfStockCount : lowStockCount }] : []),
     { id: "dashboard" as const, label: "📊 Dashboard", icon: BarChart3 },
     { id: "pedidos" as const, label: "📜 Histórico", icon: Package },
     { id: "clientes" as const, label: "👥 Clientes", icon: Users },
@@ -166,17 +155,25 @@ const Dashboard = () => {
       <div className="container py-4">
         <div className="flex items-center justify-between mb-4">
           <h1 className="font-display text-xl font-bold text-foreground">Dashboard</h1>
-          <button
-            onClick={() => {
-              setSoundEnabled((prev) => !prev);
-              if (!soundEnabled) playNotificationSound();
-              toast.success(soundEnabled ? "🔇 Notificação sonora desativada" : "🔔 Notificação sonora ativada");
-            }}
-            className={`p-2 rounded-lg border transition-colors ${soundEnabled ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"}`}
-            title={soundEnabled ? "Desativar som" : "Ativar som"}
-          >
-            {soundEnabled ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setSoundEnabled((prev) => !prev);
+                if (!soundEnabled) playNotificationSound();
+                toast.success(soundEnabled ? "🔇 Notificação sonora desativada" : "🔔 Notificação sonora ativada");
+              }}
+              className={`p-2 rounded-lg border transition-colors ${soundEnabled ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"}`}
+              title={soundEnabled ? "Desativar som" : "Ativar som"}
+            >
+              {soundEnabled ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}
+            </button>
+            <button
+              onClick={() => { signOut(); toast.success("Logout realizado"); }}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <LogOut className="h-4 w-4" /> Sair
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -194,7 +191,7 @@ const Dashboard = () => {
           ))}
         </div>
 
-        {/* KANBAN - Painel de Pedidos */}
+        {/* KANBAN */}
         {tab === "kanban" && (
           <div className="animate-fade-in">
             <OrderKanban orders={orders} onStatusChange={handleStatusChange} />
@@ -202,20 +199,15 @@ const Dashboard = () => {
         )}
 
         {/* ESTOQUE */}
-        {tab === "estoque" && (
+        {tab === "estoque" && canManageProducts && (
           <div className="animate-fade-in">
-            <StockManager 
-              products={products} 
-              onUpdateStock={updateStock} 
-              onToggleActive={toggleActive} 
-            />
+            <StockManager products={products} onUpdateStock={updateStock} onToggleActive={toggleActive} />
           </div>
         )}
 
         {/* DASHBOARD */}
         {tab === "dashboard" && (
           <div className="space-y-4 animate-fade-in">
-            {/* KPI Cards */}
             <div className="grid grid-cols-2 gap-3">
               <KPICard icon={<TrendingUp className="h-4 w-4" />} label="Vendas hoje" value={`R$ ${sumTotal(ordersToday).toFixed(2)}`} />
               <KPICard icon={<ShoppingBag className="h-4 w-4" />} label="Pedidos hoje" value={String(ordersToday.length)} />
@@ -225,7 +217,6 @@ const Dashboard = () => {
               <KPICard icon={<Users className="h-4 w-4" />} label="Clientes únicos" value={String(uniqueCustomers(ordersThisMonth))} />
             </div>
 
-            {/* Daily summary */}
             <div className="bg-card border border-border rounded-lg p-4 space-y-2">
               <h3 className="text-sm font-bold text-foreground">Resumo do Dia</h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
@@ -240,7 +231,6 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Chart */}
             <div className="bg-card border border-border rounded-lg p-4">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-sm font-bold text-foreground">Vendas por Dia</h3>
@@ -266,7 +256,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* HISTÓRICO DE PEDIDOS */}
+        {/* HISTÓRICO */}
         {tab === "pedidos" && (
           <div className="space-y-4 animate-fade-in">
             <div className="flex items-center justify-between">
@@ -282,9 +272,7 @@ const Dashboard = () => {
                 <Download className="h-3.5 w-3.5" /> CSV
               </button>
             </div>
-
             <p className="text-xs text-muted-foreground">{filteredOrders.length} pedido(s) — Total: R$ {sumTotal(filteredOrders).toFixed(2)}</p>
-
             <div className="space-y-2">
               {filteredOrders.length === 0 && <p className="text-muted-foreground text-center py-8 text-sm">Nenhum pedido neste período.</p>}
               {filteredOrders.map((o) => (
@@ -294,7 +282,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* PRODUTOS */}
+        {/* CLIENTES */}
         {tab === "clientes" && (
           <div className="space-y-4 animate-fade-in">
             <div className="flex justify-between items-center">
