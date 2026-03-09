@@ -213,7 +213,7 @@ const Admin = () => {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">{z.zone}</p>
-                      <p className="text-xs text-muted-foreground">Até {z.maxDistanceKm} km — {z.description}</p>
+                      <p className="text-xs text-muted-foreground">Até {z.max_distance_km} km — {z.description}</p>
                       {editingId === z.id ? (
                         <input
                           type="number"
