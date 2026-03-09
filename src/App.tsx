@@ -11,6 +11,7 @@ import Checkout from "./pages/Checkout";
 import Admin from "./pages/Admin";
 import Dashboard from "./pages/Dashboard";
 import ProductForm from "./pages/ProductForm";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();

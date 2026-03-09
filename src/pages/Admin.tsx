@@ -42,7 +42,15 @@ const Admin = () => {
     <div className="min-h-screen bg-background pb-10">
       <Header />
       <div className="container py-4">
-        <h1 className="font-display text-xl font-bold text-foreground mb-4">Painel Admin</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="font-display text-xl font-bold text-foreground">Painel Admin</h1>
+          <button
+            onClick={() => { signOut(); toast.success("Logout realizado"); }}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <LogOut className="h-4 w-4" /> Sair
+          </button>
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6">
