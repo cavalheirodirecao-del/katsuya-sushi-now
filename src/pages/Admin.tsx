@@ -3,7 +3,6 @@ import { Link, Navigate } from "react-router-dom";
 import { useProductsDB } from "@/hooks/useProductsDB";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
 import { useAuth } from "@/hooks/useAuth";
-import { categories } from "@/data/products";
 import Header from "@/components/Header";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -11,11 +10,12 @@ import { MapPin, Plus, BarChart3, Loader2, LogOut, Users, MapPinned, Clock, Pack
 import UserManagement from "@/components/UserManagement";
 import NeighborhoodManager from "@/components/NeighborhoodManager";
 import AuditLogViewer from "@/components/AuditLogViewer";
+import ProductManager from "@/components/ProductManager";
 
 type AdminTab = "products" | "zones" | "neighborhoods" | "users" | "audit";
 
 const Admin = () => {
-  const { products, updateProduct, loading } = useProductsDB();
+  const { products, updateProduct, loading, refresh } = useProductsDB();
   const { zones, updateZone, addZone, origin } = useDeliveryZones();
   const {
     user, isStaff, isMaster, loading: authLoading, signOut,
@@ -93,65 +93,7 @@ const Admin = () => {
 
         {/* PRODUCTS TAB */}
         {tab === "products" && canManageProducts && (
-          <>
-            {loading ? (
-              <div className="flex justify-center py-10">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : (
-              categories.map((cat) => {
-                const catProducts = products.filter((p) => p.category === cat.id);
-                if (catProducts.length === 0) return null;
-                return (
-                  <div key={cat.id} className="mb-6">
-                    <h2 className="text-sm font-bold text-primary mb-2">
-                      {cat.icon} {cat.name}
-                    </h2>
-                    <div className="space-y-2">
-                      {catProducts.map((p) => (
-                        <div key={p.id} className="bg-card border border-border rounded-lg p-3 flex items-center justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
-                            {editingId === p.id ? (
-                              <input
-                                type="number"
-                                className="mt-1 w-24 bg-secondary border border-border rounded px-2 py-1 text-sm text-foreground"
-                                value={editPrice}
-                                onChange={(e) => setEditPrice(e.target.value)}
-                                onBlur={async () => {
-                                  await updateProduct(p.id, { price: parseFloat(editPrice) || Number(p.price) });
-                                  setEditingId(null);
-                                  toast.success("Preço atualizado!");
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                                }}
-                                autoFocus
-                              />
-                            ) : (
-                              <button
-                                onClick={() => { setEditingId(p.id); setEditPrice(String(p.price)); }}
-                                className="text-xs text-primary hover:underline"
-                              >
-                                R$ {Number(p.price).toFixed(2)}
-                              </button>
-                            )}
-                          </div>
-                          <Switch
-                            checked={p.active}
-                            onCheckedChange={async (checked) => {
-                              await updateProduct(p.id, { active: checked });
-                              toast.success(checked ? "Produto ativado" : "Produto desativado");
-                            }}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </>
+          <ProductManager products={products} loading={loading} updateProduct={updateProduct} refresh={refresh} />
         )}
 
         {/* ZONES TAB */}
