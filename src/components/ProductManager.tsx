@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ProductDB, useProductsDB } from "@/hooks/useProductsDB";
+import { CategoryDB } from "@/hooks/useCategories";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Switch } from "@/components/ui/switch";
@@ -13,19 +14,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Plus, Pencil, Search, X, ImageIcon, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const CATEGORIES = [
-  { id: "combos", name: "Combos" },
-  { id: "porcoes", name: "Porções" },
-  { id: "bebidas", name: "Bebidas" },
-  { id: "sobremesas", name: "Sobremesas" },
-  { id: "frete", name: "Frete" },
-];
-
-const FILTER_CATEGORIES = [
-  { id: "all", name: "Todos" },
-  ...CATEGORIES,
-];
 
 interface ProductFormData {
   name: string;
