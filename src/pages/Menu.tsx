@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Settings } from "lucide-react";
 import { categories } from "@/data/products";
 import { useProducts } from "@/hooks/useProducts";
 import ProductCard from "@/components/ProductCard";
