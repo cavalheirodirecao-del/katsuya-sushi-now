@@ -2,9 +2,9 @@ import { useState, useMemo } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useNavigate } from "react-router-dom";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
-import { useCustomers } from "@/hooks/useCustomers";
+import { useCustomers, CustomerAddress } from "@/hooks/useCustomers";
 import { useOrdersDB, PaymentMethod } from "@/hooks/useOrdersDB";
-import { CustomerAddress } from "@/data/customer";
+
 import { OUT_OF_RANGE_MESSAGE } from "@/data/deliveryZones";
 import Header from "@/components/Header";
 import { toast } from "sonner";
@@ -102,13 +102,13 @@ const Checkout = () => {
   };
 
   // Phone lookup
-  const handlePhoneLookup = () => {
+  const handlePhoneLookup = async () => {
     const digits = phone.replace(/\D/g, "");
     if (digits.length < 10 || digits.length > 11) {
       toast.error("Telefone inválido! Use DDD + 9 dígitos.");
       return;
     }
-    const found = lookupByPhone(digits);
+    const found = await lookupByPhone(digits);
     if (found) {
       setName(found.name);
       toast.success(`Bem-vindo de volta, ${found.name}! 🎉`);
@@ -120,7 +120,7 @@ const Checkout = () => {
     setStep("details");
   };
 
-  const handleAddNewAddress = () => {
+  const handleAddNewAddress = async () => {
     if (!newAddress.street || !newAddress.number || !newAddress.neighborhood) {
       toast.error("Preencha rua, número e bairro!");
       return;
@@ -131,19 +131,23 @@ const Checkout = () => {
     }
 
     const digits = phone.replace(/\D/g, "");
-    createOrUpdate(digits, name);
+    await createOrUpdate(digits, name);
 
-    const addr: CustomerAddress = {
-      id: `addr-${Date.now()}`,
+    const success = await addAddress(digits, {
       label: newAddress.label || newAddress.neighborhood,
       street: newAddress.street,
       number: newAddress.number,
       neighborhood: newAddress.neighborhood,
       reference: newAddress.reference,
-    };
+    });
 
-    addAddress(digits, addr);
-    setSelectedAddressId(addr.id);
+    if (success) {
+      // Refresh to get the new address with its DB id
+      const updated = await lookupByPhone(digits);
+      if (updated && updated.addresses.length > 0) {
+        setSelectedAddressId(updated.addresses[0].id);
+      }
+    }
     setShowNewAddress(false);
     setNewAddress({ label: "", street: "", number: "", neighborhood: "", reference: "" });
     toast.success("Endereço salvo! ✅");

@@ -181,15 +181,14 @@ const Admin = () => {
               <input className={inputClass} placeholder="Taxa de entrega (R$)" type="number" value={newFee} onChange={(e) => setNewFee(e.target.value)} />
               <input className={inputClass} placeholder="Descrição (bairros cobertos)" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} />
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (!newZoneName || !newMaxDist || !newFee) {
                     toast.error("Preencha nome, distância e taxa!");
                     return;
                   }
-                  addZone({
-                    id: `zona-${Date.now()}`,
+                  await addZone({
                     zone: newZoneName,
-                    maxDistanceKm: parseFloat(newMaxDist),
+                    max_distance_km: parseFloat(newMaxDist),
                     fee: parseFloat(newFee),
                     description: newDesc,
                     active: true,
@@ -209,12 +208,12 @@ const Admin = () => {
             {/* Zones list */}
             <div className="space-y-2">
               <h3 className="text-sm font-bold text-foreground">Zonas configuradas</h3>
-              {zones.sort((a, b) => a.maxDistanceKm - b.maxDistanceKm).map((z) => (
+              {[...zones].sort((a, b) => Number(a.max_distance_km) - Number(b.max_distance_km)).map((z) => (
                 <div key={z.id} className="bg-card border border-border rounded-lg p-3 space-y-1">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground">{z.zone}</p>
-                      <p className="text-xs text-muted-foreground">Até {z.maxDistanceKm} km — {z.description}</p>
+                      <p className="text-xs text-muted-foreground">Até {z.max_distance_km} km — {z.description}</p>
                       {editingId === z.id ? (
                         <input
                           type="number"
@@ -222,7 +221,7 @@ const Admin = () => {
                           value={editPrice}
                           onChange={(e) => setEditPrice(e.target.value)}
                           onBlur={() => {
-                            updateZone(z.id, { fee: parseFloat(editPrice) || z.fee });
+                            updateZone(z.id, { fee: parseFloat(editPrice) || Number(z.fee) });
                             setEditingId(null);
                             toast.success("Taxa atualizada!");
                           }}
@@ -236,7 +235,7 @@ const Admin = () => {
                           onClick={() => { setEditingId(z.id); setEditPrice(String(z.fee)); }}
                           className="text-xs text-primary hover:underline"
                         >
-                          R$ {z.fee.toFixed(2)}
+                          R$ {Number(z.fee).toFixed(2)}
                         </button>
                       )}
                     </div>
