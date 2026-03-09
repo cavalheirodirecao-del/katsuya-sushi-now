@@ -45,6 +45,15 @@ const Menu = () => {
           ))
         )}
       </div>
+
+      {/* Admin quick access */}
+      <Link
+        to="/admin"
+        className="fixed bottom-6 right-6 z-50 bg-secondary text-secondary-foreground p-3 rounded-full shadow-lg hover:bg-accent transition-colors"
+        title="Área Administrativa"
+      >
+        <Settings className="h-5 w-5" />
+      </Link>
     </div>
   );
 };
