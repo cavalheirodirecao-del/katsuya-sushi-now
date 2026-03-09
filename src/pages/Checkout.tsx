@@ -23,6 +23,7 @@ const Checkout = () => {
   const { calculateFee } = useDeliveryZones();
   const { currentCustomer, lookupByPhone, createOrUpdate, addAddress } = useCustomers();
   const { createOrder } = useOrdersDB();
+  const { settings } = useCompanySettings();
   const navigate = useNavigate();
 
   // Step management
