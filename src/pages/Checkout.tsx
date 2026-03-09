@@ -231,7 +231,7 @@ const Checkout = () => {
     const paymentText =
       payment === "pix" ? "PIX — Vou enviar o comprovante." : `Dinheiro${changeFor ? ` — Troco para R$ ${changeFor}` : ""}`;
 
-    const message = `*Pedido Katsuya Sushi* 🍣
+    const message = `*Pedido ${settings.name}* 🍣
 *Nº ${order.order_number}*
 
 *Nome:* ${name}
