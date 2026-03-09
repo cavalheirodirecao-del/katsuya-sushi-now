@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
-import type { Database } from "@/integrations/supabase/types";
 
-type AppRole = Database["public"]["Enums"]["app_role"];
+type AppRole = "master" | "admin" | "operator" | "support";
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -41,12 +40,38 @@ export const useAuth = () => {
   }, []);
 
   const hasRole = (role: AppRole) => roles.includes(role);
-  const isAdmin = hasRole("admin");
+  const isMaster = hasRole("master");
+  const isAdmin = isMaster || hasRole("admin");
   const isStaff = roles.length > 0;
+
+  // Permission helpers
+  const canManageUsers = isMaster;
+  const canManageProducts = isMaster || hasRole("admin");
+  const canManageZones = isMaster || hasRole("admin");
+  const canManageNeighborhoods = isMaster || hasRole("admin");
+  const canViewDashboard = isStaff;
+  const canManageOrders = isStaff;
+  const canUpdateOrderStatus = isStaff;
 
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
-  return { user, roles, loading, hasRole, isAdmin, isStaff, signOut };
+  return {
+    user,
+    roles,
+    loading,
+    hasRole,
+    isMaster,
+    isAdmin,
+    isStaff,
+    canManageUsers,
+    canManageProducts,
+    canManageZones,
+    canManageNeighborhoods,
+    canViewDashboard,
+    canManageOrders,
+    canUpdateOrderStatus,
+    signOut,
+  };
 };
