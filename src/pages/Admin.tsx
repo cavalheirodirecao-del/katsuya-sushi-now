@@ -1,20 +1,18 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useProductsDB } from "@/hooks/useProductsDB";
 import { useDeliveryZones } from "@/hooks/useDeliveryZones";
+import { useAuth } from "@/hooks/useAuth";
 import { categories } from "@/data/products";
 import Header from "@/components/Header";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Lock, MapPin, Plus, Trash2, BarChart3, Loader2 } from "lucide-react";
-
-const ADMIN_PASS = "katsuya2024";
+import { MapPin, Plus, Trash2, BarChart3, Loader2, LogOut } from "lucide-react";
 
 const Admin = () => {
   const { products, updateProduct, loading } = useProductsDB();
   const { zones, updateZone, addZone, removeZone, origin } = useDeliveryZones();
-  const [auth, setAuth] = useState(false);
-  const [pass, setPass] = useState("");
+  const { user, isStaff, loading: authLoading, signOut } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState("");
   const [tab, setTab] = useState<"products" | "zones">("products");
@@ -25,39 +23,16 @@ const Admin = () => {
   const [newFee, setNewFee] = useState("");
   const [newDesc, setNewDesc] = useState("");
 
-  if (!auth) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="bg-card border border-border rounded-xl p-6 w-80 space-y-4">
-          <div className="flex items-center justify-center">
-            <Lock className="h-8 w-8 text-primary" />
-          </div>
-          <h1 className="font-display text-lg font-bold text-foreground text-center">Admin</h1>
-          <input
-            type="password"
-            className="w-full bg-secondary border border-border rounded-lg px-4 py-3 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-            placeholder="Senha"
-            value={pass}
-            onChange={(e) => setPass(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                if (pass === ADMIN_PASS) setAuth(true);
-                else toast.error("Senha incorreta");
-              }
-            }}
-          />
-          <button
-            onClick={() => {
-              if (pass === ADMIN_PASS) setAuth(true);
-              else toast.error("Senha incorreta");
-            }}
-            className="w-full gradient-red text-primary-foreground py-3 rounded-lg font-bold"
-          >
-            Entrar
-          </button>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (!user || !isStaff) {
+    return <Navigate to="/login" replace />;
   }
 
   const inputClass =
