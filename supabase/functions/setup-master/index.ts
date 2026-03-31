@@ -16,17 +16,7 @@ Deno.serve(async (req) => {
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
     const body = await req.json();
-    const { email, password, full_name } = body;
-
-    if (!email || !password) {
-      return new Response(JSON.stringify({ error: "Email e senha obrigatórios" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    // Check if any master already exists
-    const { data: existingMasters } = await supabaseAdmin.from("user_roles").select("*").eq("role", "master");
-    if (existingMasters && existingMasters.length > 0) {
-      return new Response(JSON.stringify({ error: "Já existe um master cadastrado" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const { email, password, full_name, role } = body;
 
     const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -36,7 +26,7 @@ Deno.serve(async (req) => {
     });
     if (createErr) throw createErr;
 
-    await supabaseAdmin.from("user_roles").insert({ user_id: newUser.user.id, role: "master" });
+    await supabaseAdmin.from("user_roles").insert({ user_id: newUser.user.id, role: role || "master" });
     await supabaseAdmin.from("profiles").insert({ user_id: newUser.user.id, full_name: full_name || "" });
 
     return new Response(JSON.stringify({ success: true, user_id: newUser.user.id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
