@@ -319,15 +319,7 @@ const ProductManager = ({ products, loading, updateProduct, refresh, categories 
             </div>
 
             {/* Imagem */}
-            <div className="space-y-1.5">
-              <Label>URL da Imagem</Label>
-              <Input type="url" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="https://exemplo.com/imagem.jpg" />
-              {form.image_url && (
-                <div className="w-24 h-24 rounded-lg overflow-hidden border">
-                  <img src={form.image_url} alt="Preview" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
-                </div>
-              )}
-            </div>
+            <ImageUpload value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} />
 
             {/* Sabores */}
             <div className="space-y-1.5">
