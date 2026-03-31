@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Plus, Pencil, Search, X, ImageIcon, Package } from "lucide-react";
+import ImageUpload from "@/components/ImageUpload";
 import { cn } from "@/lib/utils";
 
 interface ProductFormData {
