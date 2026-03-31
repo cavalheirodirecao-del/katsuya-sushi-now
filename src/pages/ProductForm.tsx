@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, X, ImageIcon } from "lucide-react";
+import { ArrowLeft, Plus, X } from "lucide-react";
+import ImageUpload from "@/components/ImageUpload";
 
 const categories = [
   { id: "combos", name: "Combos" },
@@ -190,34 +191,8 @@ const ProductForm = () => {
                 />
               </div>
 
-              {/* Imagem URL */}
-              <div className="space-y-2">
-                <Label htmlFor="imageUrl">URL da Imagem</Label>
-                <Input
-                  id="imageUrl"
-                  type="url"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="https://exemplo.com/imagem.jpg"
-                />
-                {imageUrl && (
-                  <div className="mt-2 relative w-32 h-32 rounded-lg overflow-hidden border">
-                    <img
-                      src={imageUrl}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                  </div>
-                )}
-                {!imageUrl && (
-                  <div className="mt-2 w-32 h-32 rounded-lg border border-dashed flex items-center justify-center text-muted-foreground">
-                    <ImageIcon className="h-8 w-8" />
-                  </div>
-                )}
-              </div>
+              {/* Imagem */}
+              <ImageUpload value={imageUrl} onChange={setImageUrl} />
 
               {/* Sabores */}
               <div className="space-y-2">
