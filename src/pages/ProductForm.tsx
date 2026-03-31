@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Plus, X, ImageIcon } from "lucide-react";
+import { ArrowLeft, Plus, X } from "lucide-react";
+import ImageUpload from "@/components/ImageUpload";
 
 const categories = [
   { id: "combos", name: "Combos" },
