@@ -491,9 +491,21 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
                   </button>
                 </div>
               )}
+
+              {/* RETIRADA MODE */}
+              {deliveryMode === "retirada" && (
+                <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                  <p className="text-sm font-bold text-primary">🏪 Retirada no local — Frete: Grátis</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {settings.address ? `Retire em: ${settings.address}` : "Retire no endereço do restaurante"}
+                    {settings.city ? `, ${settings.city}` : ""}
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Address */}
+            {/* Address — hidden for pickup */}
+            {deliveryMode !== "retirada" && (
             <div className="space-y-3 animate-fade-in">
               <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-primary" /> Endereço de Entrega
