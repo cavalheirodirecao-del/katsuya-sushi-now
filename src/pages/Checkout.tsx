@@ -20,7 +20,7 @@ const formatPhone = (value: string) => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
-type DeliveryMode = "auto" | "manual";
+type DeliveryMode = "auto" | "manual" | "retirada";
 
 const Checkout = () => {
   const { items, total, clearCart } = useCart();
