@@ -210,21 +210,39 @@ const Checkout = () => {
       return;
     }
 
-    const addrNeighborhood = deliveryMode === "manual" && selectedNeighborhood
-      ? selectedNeighborhood.name
-      : (selectedAddress?.neighborhood || newAddress.neighborhood);
+    const isPickup = deliveryMode === "retirada";
 
-    const finalAddress = selectedAddress || (showNewAddress ? {
-      street: newAddress.street,
-      number: newAddress.number,
-      neighborhood: addrNeighborhood,
-      reference: newAddress.reference,
-    } : null);
+    let finalAddress: { street: string; number: string; neighborhood: string; reference?: string } | null = null;
 
-    if (!finalAddress || !finalAddress.street || !finalAddress.neighborhood) {
-      toast.error("Selecione ou adicione um endereço!");
-      return;
+    if (isPickup) {
+      finalAddress = {
+        street: "Retirada no local",
+        number: "-",
+        neighborhood: "Retirada",
+      };
+    } else {
+      const addrNeighborhood = deliveryMode === "manual" && selectedNeighborhood
+        ? selectedNeighborhood.name
+        : (selectedAddress?.neighborhood || newAddress.neighborhood);
+
+      finalAddress = selectedAddress ? {
+        street: selectedAddress.street,
+        number: selectedAddress.number,
+        neighborhood: selectedAddress.neighborhood,
+        reference: selectedAddress.reference || undefined,
+      } : (showNewAddress ? {
+        street: newAddress.street,
+        number: newAddress.number,
+        neighborhood: addrNeighborhood,
+        reference: newAddress.reference,
+      } : null);
+
+      if (!finalAddress || !finalAddress.street || !finalAddress.neighborhood) {
+        toast.error("Selecione ou adicione um endereço!");
+        return;
+      }
     }
+
     if (!hasValidDelivery) {
       toast.error("Selecione uma forma de cálculo de frete!");
       return;
@@ -252,10 +270,10 @@ const Checkout = () => {
       name,
       digits,
       {
-        street: finalAddress.street,
-        number: finalAddress.number,
-        neighborhood: finalAddress.neighborhood,
-        reference: finalAddress.reference,
+        street: finalAddress!.street,
+        number: finalAddress!.number,
+        neighborhood: finalAddress!.neighborhood,
+        reference: finalAddress!.reference,
       },
       orderItems,
       total,
@@ -278,9 +296,17 @@ const Checkout = () => {
     const paymentText =
       payment === "pix" ? "PIX — Vou enviar o comprovante." : `Dinheiro${changeFor ? ` — Troco para R$ ${changeFor}` : ""}`;
 
-    const deliveryInfo = deliveryMode === "auto" && feeResultAuto
-      ? `📍 Distância: ${feeResultAuto.distanceKm} km\n🛵 Zona: ${feeResultAuto.zone.zone}`
-      : `📍 Bairro: ${finalAddress.neighborhood}`;
+    const deliveryInfo = isPickup
+      ? "🏪 *Retirada no local* — Sem taxa de entrega"
+      : deliveryMode === "auto" && feeResultAuto
+        ? `📍 Distância: ${feeResultAuto.distanceKm} km\n🛵 Zona: ${feeResultAuto.zone.zone}`
+        : `📍 Bairro: ${finalAddress!.neighborhood}`;
+
+    const addressBlock = isPickup
+      ? `*Modalidade:* Retirada no local`
+      : `*Endereço:*\n${finalAddress!.street}, ${finalAddress!.number}\nBairro: ${finalAddress!.neighborhood}${finalAddress!.reference ? `\nRef: ${finalAddress!.reference}` : ""}`;
+
+    const feeLabel = isPickup ? "Retirada: Grátis" : `Taxa entrega: R$ ${deliveryFee.toFixed(2)}`;
 
     const message = `*Pedido ${settings.name}* 🍣
 *Nº ${order.order_number}*
@@ -288,10 +314,7 @@ const Checkout = () => {
 *Nome:* ${name}
 *Telefone:* ${formatPhone(digits)}
 
-*Endereço:*
-${finalAddress.street}, ${finalAddress.number}
-Bairro: ${finalAddress.neighborhood}
-${finalAddress.reference ? `Ref: ${finalAddress.reference}` : ""}
+${addressBlock}
 
 ${deliveryInfo}
 
@@ -299,7 +322,7 @@ ${deliveryInfo}
 ${itemsText}
 
 Subtotal: R$ ${total.toFixed(2)}
-Taxa entrega: R$ ${deliveryFee.toFixed(2)}
+${feeLabel}
 
 *Total: R$ ${grandTotal.toFixed(2)}*
 
