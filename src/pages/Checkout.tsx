@@ -142,6 +142,13 @@ const Checkout = () => {
     setSelectedNeighborhoodId("");
   };
 
+  const switchToRetirada = () => {
+    setDeliveryMode("retirada");
+    setCustomerCoords(null);
+    setGeoError("");
+    setSelectedNeighborhoodId("");
+  };
+
   // Phone lookup
   const handlePhoneLookup = async () => {
     const digits = phone.replace(/\D/g, "");
