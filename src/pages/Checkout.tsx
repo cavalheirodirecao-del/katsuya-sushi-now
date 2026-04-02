@@ -716,9 +716,15 @@ ${feeLabel}
                   <span className="text-foreground">R$ {total.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Taxa de entrega</span>
+                  <span className="text-muted-foreground">
+                    {deliveryMode === "retirada" ? "Retirada" : "Taxa de entrega"}
+                  </span>
                   <span className="text-foreground">
-                    {hasValidDelivery ? `R$ ${deliveryFee.toFixed(2)}` : "Selecione o frete"}
+                    {deliveryMode === "retirada"
+                      ? "Grátis"
+                      : hasValidDelivery
+                        ? `R$ ${deliveryFee.toFixed(2)}`
+                        : "Selecione o frete"}
                   </span>
                 </div>
                 <div className="border-t border-border pt-2 flex justify-between font-bold">
