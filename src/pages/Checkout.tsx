@@ -611,6 +611,7 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
                 </div>
               )}
             </div>
+            )}
 
             {/* Payment */}
             <div className="space-y-3 animate-fade-in">
