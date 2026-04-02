@@ -20,7 +20,7 @@ const formatPhone = (value: string) => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
-type DeliveryMode = "auto" | "manual";
+type DeliveryMode = "auto" | "manual" | "retirada";
 
 const Checkout = () => {
   const { items, total, clearCart } = useCart();
@@ -80,13 +80,17 @@ const Checkout = () => {
   }, [selectedNeighborhoodId, activeNeighborhoods]);
 
   // Unified fee
-  const deliveryFee = deliveryMode === "auto"
-    ? (feeResultAuto?.fee || 0)
-    : (selectedNeighborhood ? Number(selectedNeighborhood.fee) : 0);
+  const deliveryFee = deliveryMode === "retirada"
+    ? 0
+    : deliveryMode === "auto"
+      ? (feeResultAuto?.fee || 0)
+      : (selectedNeighborhood ? Number(selectedNeighborhood.fee) : 0);
 
-  const hasValidDelivery = deliveryMode === "auto"
-    ? !!feeResultAuto
-    : !!selectedNeighborhood;
+  const hasValidDelivery = deliveryMode === "retirada"
+    ? true
+    : deliveryMode === "auto"
+      ? !!feeResultAuto
+      : !!selectedNeighborhood;
 
   const grandTotal = total + deliveryFee;
 
@@ -135,6 +139,13 @@ const Checkout = () => {
 
   const switchToAuto = () => {
     setDeliveryMode("auto");
+    setSelectedNeighborhoodId("");
+  };
+
+  const switchToRetirada = () => {
+    setDeliveryMode("retirada");
+    setCustomerCoords(null);
+    setGeoError("");
     setSelectedNeighborhoodId("");
   };
 
@@ -199,21 +210,39 @@ const Checkout = () => {
       return;
     }
 
-    const addrNeighborhood = deliveryMode === "manual" && selectedNeighborhood
-      ? selectedNeighborhood.name
-      : (selectedAddress?.neighborhood || newAddress.neighborhood);
+    const isPickup = deliveryMode === "retirada";
 
-    const finalAddress = selectedAddress || (showNewAddress ? {
-      street: newAddress.street,
-      number: newAddress.number,
-      neighborhood: addrNeighborhood,
-      reference: newAddress.reference,
-    } : null);
+    let finalAddress: { street: string; number: string; neighborhood: string; reference?: string } | null = null;
 
-    if (!finalAddress || !finalAddress.street || !finalAddress.neighborhood) {
-      toast.error("Selecione ou adicione um endereço!");
-      return;
+    if (isPickup) {
+      finalAddress = {
+        street: "Retirada no local",
+        number: "-",
+        neighborhood: "Retirada",
+      };
+    } else {
+      const addrNeighborhood = deliveryMode === "manual" && selectedNeighborhood
+        ? selectedNeighborhood.name
+        : (selectedAddress?.neighborhood || newAddress.neighborhood);
+
+      finalAddress = selectedAddress ? {
+        street: selectedAddress.street,
+        number: selectedAddress.number,
+        neighborhood: selectedAddress.neighborhood,
+        reference: selectedAddress.reference || undefined,
+      } : (showNewAddress ? {
+        street: newAddress.street,
+        number: newAddress.number,
+        neighborhood: addrNeighborhood,
+        reference: newAddress.reference,
+      } : null);
+
+      if (!finalAddress || !finalAddress.street || !finalAddress.neighborhood) {
+        toast.error("Selecione ou adicione um endereço!");
+        return;
+      }
     }
+
     if (!hasValidDelivery) {
       toast.error("Selecione uma forma de cálculo de frete!");
       return;
@@ -241,10 +270,10 @@ const Checkout = () => {
       name,
       digits,
       {
-        street: finalAddress.street,
-        number: finalAddress.number,
-        neighborhood: finalAddress.neighborhood,
-        reference: finalAddress.reference,
+        street: finalAddress!.street,
+        number: finalAddress!.number,
+        neighborhood: finalAddress!.neighborhood,
+        reference: finalAddress!.reference,
       },
       orderItems,
       total,
@@ -267,9 +296,17 @@ const Checkout = () => {
     const paymentText =
       payment === "pix" ? "PIX — Vou enviar o comprovante." : `Dinheiro${changeFor ? ` — Troco para R$ ${changeFor}` : ""}`;
 
-    const deliveryInfo = deliveryMode === "auto" && feeResultAuto
-      ? `📍 Distância: ${feeResultAuto.distanceKm} km\n🛵 Zona: ${feeResultAuto.zone.zone}`
-      : `📍 Bairro: ${finalAddress.neighborhood}`;
+    const deliveryInfo = isPickup
+      ? "🏪 *Retirada no local* — Sem taxa de entrega"
+      : deliveryMode === "auto" && feeResultAuto
+        ? `📍 Distância: ${feeResultAuto.distanceKm} km\n🛵 Zona: ${feeResultAuto.zone.zone}`
+        : `📍 Bairro: ${finalAddress!.neighborhood}`;
+
+    const addressBlock = isPickup
+      ? `*Modalidade:* Retirada no local`
+      : `*Endereço:*\n${finalAddress!.street}, ${finalAddress!.number}\nBairro: ${finalAddress!.neighborhood}${finalAddress!.reference ? `\nRef: ${finalAddress!.reference}` : ""}`;
+
+    const feeLabel = isPickup ? "Retirada: Grátis" : `Taxa entrega: R$ ${deliveryFee.toFixed(2)}`;
 
     const message = `*Pedido ${settings.name}* 🍣
 *Nº ${order.order_number}*
@@ -277,10 +314,7 @@ const Checkout = () => {
 *Nome:* ${name}
 *Telefone:* ${formatPhone(digits)}
 
-*Endereço:*
-${finalAddress.street}, ${finalAddress.number}
-Bairro: ${finalAddress.neighborhood}
-${finalAddress.reference ? `Ref: ${finalAddress.reference}` : ""}
+${addressBlock}
 
 ${deliveryInfo}
 
@@ -288,7 +322,7 @@ ${deliveryInfo}
 ${itemsText}
 
 Subtotal: R$ ${total.toFixed(2)}
-Taxa entrega: R$ ${deliveryFee.toFixed(2)}
+${feeLabel}
 
 *Total: R$ ${grandTotal.toFixed(2)}*
 
@@ -371,23 +405,33 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
               <div className="flex gap-2">
                 <button
                   onClick={switchToAuto}
-                  className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
                     deliveryMode === "auto"
                       ? "gradient-red text-primary-foreground border-primary"
                       : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
                   }`}
                 >
-                  📍 Localização Automática
+                  📍 Automática
                 </button>
                 <button
                   onClick={switchToManual}
-                  className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
                     deliveryMode === "manual"
                       ? "gradient-red text-primary-foreground border-primary"
                       : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
                   }`}
                 >
-                  🏘️ Selecionar Bairro
+                  🏘️ Bairro
+                </button>
+                <button
+                  onClick={switchToRetirada}
+                  className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
+                    deliveryMode === "retirada"
+                      ? "gradient-red text-primary-foreground border-primary"
+                      : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
+                  }`}
+                >
+                  🏪 Retirada
                 </button>
               </div>
 
@@ -470,9 +514,21 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
                   </button>
                 </div>
               )}
+
+              {/* RETIRADA MODE */}
+              {deliveryMode === "retirada" && (
+                <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                  <p className="text-sm font-bold text-primary">🏪 Retirada no local — Frete: Grátis</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {settings.address ? `Retire em: ${settings.address}` : "Retire no endereço do restaurante"}
+                    {settings.city ? `, ${settings.city}` : ""}
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Address */}
+            {/* Address — hidden for pickup */}
+            {deliveryMode !== "retirada" && (
             <div className="space-y-3 animate-fade-in">
               <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <MapPin className="h-4 w-4 text-primary" /> Endereço de Entrega
@@ -578,6 +634,7 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
                 </div>
               )}
             </div>
+            )}
 
             {/* Payment */}
             <div className="space-y-3 animate-fade-in">
@@ -659,9 +716,15 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
                   <span className="text-foreground">R$ {total.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Taxa de entrega</span>
+                  <span className="text-muted-foreground">
+                    {deliveryMode === "retirada" ? "Retirada" : "Taxa de entrega"}
+                  </span>
                   <span className="text-foreground">
-                    {hasValidDelivery ? `R$ ${deliveryFee.toFixed(2)}` : "Selecione o frete"}
+                    {deliveryMode === "retirada"
+                      ? "Grátis"
+                      : hasValidDelivery
+                        ? `R$ ${deliveryFee.toFixed(2)}`
+                        : "Selecione o frete"}
                   </span>
                 </div>
                 <div className="border-t border-border pt-2 flex justify-between font-bold">
