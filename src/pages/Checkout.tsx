@@ -382,23 +382,33 @@ Taxa entrega: R$ ${deliveryFee.toFixed(2)}
               <div className="flex gap-2">
                 <button
                   onClick={switchToAuto}
-                  className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
                     deliveryMode === "auto"
                       ? "gradient-red text-primary-foreground border-primary"
                       : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
                   }`}
                 >
-                  📍 Localização Automática
+                  📍 Automática
                 </button>
                 <button
                   onClick={switchToManual}
-                  className={`flex-1 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
                     deliveryMode === "manual"
                       ? "gradient-red text-primary-foreground border-primary"
                       : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
                   }`}
                 >
-                  🏘️ Selecionar Bairro
+                  🏘️ Bairro
+                </button>
+                <button
+                  onClick={switchToRetirada}
+                  className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
+                    deliveryMode === "retirada"
+                      ? "gradient-red text-primary-foreground border-primary"
+                      : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
+                  }`}
+                >
+                  🏪 Retirada
                 </button>
               </div>
 
