@@ -80,13 +80,17 @@ const Checkout = () => {
   }, [selectedNeighborhoodId, activeNeighborhoods]);
 
   // Unified fee
-  const deliveryFee = deliveryMode === "auto"
-    ? (feeResultAuto?.fee || 0)
-    : (selectedNeighborhood ? Number(selectedNeighborhood.fee) : 0);
+  const deliveryFee = deliveryMode === "retirada"
+    ? 0
+    : deliveryMode === "auto"
+      ? (feeResultAuto?.fee || 0)
+      : (selectedNeighborhood ? Number(selectedNeighborhood.fee) : 0);
 
-  const hasValidDelivery = deliveryMode === "auto"
-    ? !!feeResultAuto
-    : !!selectedNeighborhood;
+  const hasValidDelivery = deliveryMode === "retirada"
+    ? true
+    : deliveryMode === "auto"
+      ? !!feeResultAuto
+      : !!selectedNeighborhood;
 
   const grandTotal = total + deliveryFee;
 
