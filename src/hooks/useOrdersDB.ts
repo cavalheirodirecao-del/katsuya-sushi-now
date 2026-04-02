@@ -177,24 +177,6 @@ export const useOrdersDB = () => {
       console.error("Error creating order items:", itemsError);
     }
 
-    // Insert order items
-    const orderItems = items.map((item) => ({
-      order_id: orderData.id,
-      product_id: item.productId || null,
-      product_name: item.name,
-      quantity: item.quantity,
-      price: item.price,
-      flavor: item.flavor || null,
-      notes: item.notes || null,
-    }));
-
-    const { error: itemsError } = await supabase
-      .from("order_items")
-      .insert(orderItems);
-
-    if (itemsError) {
-      console.error("Error creating order items:", itemsError);
-    }
 
     return orderData as OrderDB;
   };
