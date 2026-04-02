@@ -134,7 +134,7 @@ export const useOrdersDB = () => {
   ): Promise<OrderDB | null> => {
     const orderNumber = `PED-${Date.now().toString(36).toUpperCase()}`;
 
-    const { data: orderData, error: orderError } = await supabase
+    const { error: orderError } = await supabase
       .from("orders")
       .insert({
         order_number: orderNumber,
@@ -149,14 +149,31 @@ export const useOrdersDB = () => {
         total,
         payment_method: paymentMethod,
         status: "pendente" as OrderStatus,
-      })
-      .select()
-      .single();
+      });
 
-    if (orderError || !orderData) {
+    if (orderError) {
       console.error("Error creating order:", orderError);
       return null;
     }
+
+    // Build a local order object since anonymous users can't SELECT from orders
+    const orderData = {
+      id: crypto.randomUUID(),
+      order_number: orderNumber,
+      customer_name: customerName,
+      customer_phone: customerPhone,
+      address_street: address.street,
+      address_number: address.number,
+      address_neighborhood: address.neighborhood,
+      address_reference: address.reference || null,
+      subtotal,
+      delivery_fee: deliveryFee,
+      total,
+      payment_method: paymentMethod,
+      status: "pendente" as OrderStatus,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
 
     // Insert order items
     const orderItems = items.map((item) => ({
