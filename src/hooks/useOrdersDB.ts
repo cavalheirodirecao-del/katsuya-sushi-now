@@ -177,6 +177,7 @@ export const useOrdersDB = () => {
       console.error("Error creating order items:", itemsError);
     }
 
+
     return orderData as OrderDB;
   };
 

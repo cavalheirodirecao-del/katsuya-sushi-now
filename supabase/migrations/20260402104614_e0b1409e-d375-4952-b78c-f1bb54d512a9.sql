@@ -1,0 +1,1 @@
+CREATE POLICY "Anyone can view their own new order on insert" ON public.orders FOR SELECT TO public USING (true);
