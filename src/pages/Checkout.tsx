@@ -10,7 +10,7 @@ import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { OUT_OF_RANGE_MESSAGE } from "@/data/deliveryZones";
 import Header from "@/components/Header";
 import { toast } from "sonner";
-import { MessageCircle, Copy, User, MapPin, Plus, Check, Phone, Navigation, Loader2, AlertTriangle } from "lucide-react";
+import { MessageCircle, Copy, User, MapPin, Plus, Check, Phone, Navigation, Loader2, AlertTriangle, ArrowLeft, ExternalLink } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const formatPhone = (value: string) => {
