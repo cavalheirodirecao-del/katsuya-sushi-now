@@ -34,6 +34,8 @@ const Checkout = () => {
   // Step management
   const [step, setStep] = useState<"phone" | "details" | "payment">("phone");
   const [submitting, setSubmitting] = useState(false);
+  const [whatsappMessage, setWhatsappMessage] = useState<string | null>(null);
+  const [whatsappUrl, setWhatsappUrl] = useState<string>("");
 
   // Phone step
   const [phone, setPhone] = useState("");
