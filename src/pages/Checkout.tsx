@@ -10,7 +10,7 @@ import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { OUT_OF_RANGE_MESSAGE } from "@/data/deliveryZones";
 import Header from "@/components/Header";
 import { toast } from "sonner";
-import { MessageCircle, Copy, User, MapPin, Plus, Check, Phone, Navigation, Loader2, AlertTriangle } from "lucide-react";
+import { MessageCircle, Copy, User, MapPin, Plus, Check, Phone, Navigation, Loader2, AlertTriangle, ArrowLeft, ExternalLink } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const formatPhone = (value: string) => {
@@ -34,6 +34,8 @@ const Checkout = () => {
   // Step management
   const [step, setStep] = useState<"phone" | "details" | "payment">("phone");
   const [submitting, setSubmitting] = useState(false);
+  const [whatsappMessage, setWhatsappMessage] = useState<string | null>(null);
+  const [whatsappUrl, setWhatsappUrl] = useState<string>("");
 
   // Phone step
   const [phone, setPhone] = useState("");
@@ -330,10 +332,17 @@ ${feeLabel}
 
     const encoded = encodeURIComponent(message);
     const whatsappPhone = settings.phone.replace(/\D/g, "");
-    window.open(`https://wa.me/${whatsappPhone}?text=${encoded}`, "_blank");
+    setWhatsappUrl(`https://wa.me/${whatsappPhone}?text=${encoded}`);
+    setWhatsappMessage(message);
+    setSubmitting(false);
+  };
+
+  const handleOpenWhatsApp = () => {
+    window.open(whatsappUrl, "_blank");
     clearCart();
     navigate("/");
     toast.success("Pedido enviado! Verifique o WhatsApp.");
+  };
   };
 
   const inputClass =
@@ -343,6 +352,53 @@ ${feeLabel}
     <div className="min-h-screen bg-background pb-10">
       <Header />
       <div className="container py-4 space-y-6">
+
+        {/* WHATSAPP MESSAGE PREVIEW */}
+        {whatsappMessage ? (
+          <div className="space-y-4 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setWhatsappMessage(null)}
+                className="p-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-accent transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <h1 className="font-display text-xl font-bold text-foreground">Pedido Pronto!</h1>
+            </div>
+
+            <div className="bg-card border border-border rounded-xl p-4 space-y-3">
+              <p className="text-sm font-bold text-foreground flex items-center gap-2">
+                <MessageCircle className="h-4 w-4 text-primary" /> Mensagem do Pedido
+              </p>
+              <div className="bg-secondary rounded-lg p-4 whitespace-pre-wrap text-sm text-foreground leading-relaxed font-mono">
+                {whatsappMessage}
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(whatsappMessage);
+                  toast.success("Mensagem copiada!");
+                }}
+                className="w-full bg-secondary border border-border rounded-lg py-2.5 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Copy className="h-4 w-4" /> Copiar mensagem
+              </button>
+            </div>
+
+            <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 space-y-2">
+              <p className="text-sm text-primary font-medium">
+                📱 Clique no botão abaixo para abrir o WhatsApp com a mensagem já preenchida. Basta apertar <strong>Enviar</strong>!
+              </p>
+            </div>
+
+            <button
+              onClick={handleOpenWhatsApp}
+              className="w-full gradient-red text-primary-foreground py-4 rounded-full font-bold text-base flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
+            >
+              <ExternalLink className="h-5 w-5" /> Abrir WhatsApp e Enviar
+            </button>
+          </div>
+        ) : (
+        <>
         <h1 className="font-display text-xl font-bold text-foreground">Finalizar Pedido</h1>
 
         {/* STEP 1: Phone */}
@@ -517,12 +573,28 @@ ${feeLabel}
 
               {/* RETIRADA MODE */}
               {deliveryMode === "retirada" && (
-                <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
-                  <p className="text-sm font-bold text-primary">🏪 Retirada no local — Frete: Grátis</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {settings.address ? `Retire em: ${settings.address}` : "Retire no endereço do restaurante"}
-                    {settings.city ? `, ${settings.city}` : ""}
+                <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 space-y-2">
+                  <p className="text-base font-bold text-primary flex items-center gap-2">
+                    🏪 Retirada no Local — Frete: Grátis
                   </p>
+                  <div className="bg-card border border-border rounded-lg p-3 space-y-1">
+                    <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <MapPin className="h-3.5 w-3.5 text-primary" /> Endereço para Retirada:
+                    </p>
+                    <p className="text-sm text-foreground">
+                      {settings.address || "Endereço não configurado"}
+                    </p>
+                    {(settings.city || settings.state) && (
+                      <p className="text-sm text-muted-foreground">
+                        {[settings.city, settings.state].filter(Boolean).join(" — ")}
+                      </p>
+                    )}
+                    {!settings.address && (
+                      <p className="text-xs text-destructive mt-1">
+                        ⚠️ O restaurante ainda não cadastrou o endereço. Entre em contato para confirmar o local de retirada.
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -747,6 +819,8 @@ ${feeLabel}
               )}
             </button>
           </>
+        )}
+        </>
         )}
       </div>
     </div>
