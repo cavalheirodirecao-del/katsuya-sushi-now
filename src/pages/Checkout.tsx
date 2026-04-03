@@ -332,10 +332,17 @@ ${feeLabel}
 
     const encoded = encodeURIComponent(message);
     const whatsappPhone = settings.phone.replace(/\D/g, "");
-    window.open(`https://wa.me/${whatsappPhone}?text=${encoded}`, "_blank");
+    setWhatsappUrl(`https://wa.me/${whatsappPhone}?text=${encoded}`);
+    setWhatsappMessage(message);
+    setSubmitting(false);
+  };
+
+  const handleOpenWhatsApp = () => {
+    window.open(whatsappUrl, "_blank");
     clearCart();
     navigate("/");
     toast.success("Pedido enviado! Verifique o WhatsApp.");
+  };
   };
 
   const inputClass =
