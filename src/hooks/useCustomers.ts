@@ -146,5 +146,23 @@ export const useCustomers = () => {
     return true;
   }, [lookupByPhone]);
 
-  return { currentCustomer, setCurrentCustomer, lookupByPhone, createOrUpdate, addAddress };
+  const deleteAddress = useCallback(async (addressId: string, phone?: string): Promise<boolean> => {
+    const { error } = await supabase
+      .from("customer_addresses")
+      .delete()
+      .eq("id", addressId);
+
+    if (error) {
+      console.error("Error deleting address:", error);
+      return false;
+    }
+
+    // Refresh customer data if phone provided
+    if (phone) {
+      await lookupByPhone(phone);
+    }
+    return true;
+  }, [lookupByPhone]);
+
+  return { currentCustomer, setCurrentCustomer, lookupByPhone, createOrUpdate, addAddress, deleteAddress };
 };

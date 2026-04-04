@@ -5,7 +5,7 @@ import {
 } from "date-fns";
 
 export type OrderStatus = "pendente" | "confirmado" | "preparando" | "saiu_entrega" | "entregue" | "cancelado";
-export type PaymentMethod = "pix" | "dinheiro";
+export type PaymentMethod = "pix" | "dinheiro" | "cartao";
 
 export interface OrderItemDB {
   id: string;

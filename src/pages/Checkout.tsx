@@ -1,17 +1,19 @@
 import { useState, useMemo } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useNavigate } from "react-router-dom";
-import { useDeliveryZones } from "@/hooks/useDeliveryZones";
 import { useNeighborhoodsDB } from "@/hooks/useNeighborhoodsDB";
 import { useCustomers, CustomerAddress } from "@/hooks/useCustomers";
 import { useOrdersDB, PaymentMethod } from "@/hooks/useOrdersDB";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 
-import { OUT_OF_RANGE_MESSAGE } from "@/data/deliveryZones";
 import Header from "@/components/Header";
 import { toast } from "sonner";
-import { MessageCircle, Copy, User, MapPin, Plus, Check, Phone, Navigation, Loader2, AlertTriangle, ArrowLeft, ExternalLink } from "lucide-react";
+import { MessageCircle, Copy, User, MapPin, Plus, Check, Phone, Navigation, Loader2, ArrowLeft, ExternalLink, Trash2, CreditCard } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const formatPhone = (value: string) => {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -20,13 +22,12 @@ const formatPhone = (value: string) => {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
-type DeliveryMode = "auto" | "manual" | "retirada";
+type DeliveryMode = "manual" | "retirada";
 
 const Checkout = () => {
   const { items, total, clearCart } = useCart();
-  const { calculateFee } = useDeliveryZones();
   const { activeNeighborhoods, loading: neighbLoading } = useNeighborhoodsDB();
-  const { currentCustomer, lookupByPhone, createOrUpdate, addAddress } = useCustomers();
+  const { currentCustomer, lookupByPhone, createOrUpdate, addAddress, deleteAddress } = useCustomers();
   const { createOrder } = useOrdersDB();
   const { settings } = useCompanySettings();
   const navigate = useNavigate();
@@ -47,13 +48,11 @@ const Checkout = () => {
   const [showNewAddress, setShowNewAddress] = useState(false);
   const [newAddress, setNewAddress] = useState({ label: "", street: "", number: "", neighborhood: "", reference: "" });
 
-  // Delivery mode: auto (GPS) or manual (select neighborhood)
-  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("auto");
+  // Delete address confirmation
+  const [deleteAddrId, setDeleteAddrId] = useState<string | null>(null);
 
-  // Geolocation (auto mode)
-  const [geoLoading, setGeoLoading] = useState(false);
-  const [customerCoords, setCustomerCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [geoError, setGeoError] = useState("");
+  // Delivery mode
+  const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("manual");
 
   // Manual mode
   const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState<string>("");
@@ -70,12 +69,6 @@ const Checkout = () => {
     return null;
   }, [selectedAddressId, currentCustomer]);
 
-  // Fee calculation based on mode
-  const feeResultAuto = useMemo(() => {
-    if (!customerCoords) return null;
-    return calculateFee(customerCoords.lat, customerCoords.lng);
-  }, [customerCoords, calculateFee]);
-
   const selectedNeighborhood = useMemo(() => {
     if (!selectedNeighborhoodId) return null;
     return activeNeighborhoods.find((n) => n.id === selectedNeighborhoodId) || null;
@@ -84,71 +77,53 @@ const Checkout = () => {
   // Unified fee
   const deliveryFee = deliveryMode === "retirada"
     ? 0
-    : deliveryMode === "auto"
-      ? (feeResultAuto?.fee || 0)
-      : (selectedNeighborhood ? Number(selectedNeighborhood.fee) : 0);
+    : (selectedNeighborhood ? Number(selectedNeighborhood.fee) : 0);
 
-  const hasValidDelivery = deliveryMode === "retirada"
-    ? true
-    : deliveryMode === "auto"
-      ? !!feeResultAuto
-      : !!selectedNeighborhood;
+  const hasValidDelivery = deliveryMode === "retirada" || !!selectedNeighborhood;
 
-  const grandTotal = total + deliveryFee;
+  // Card fee (6%)
+  const cardFee = payment === "cartao" ? (total + deliveryFee) * 0.06 : 0;
+  const grandTotal = total + deliveryFee + cardFee;
 
-  // Geolocation handler
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      setGeoError("Geolocalização não suportada pelo navegador.");
-      return;
-    }
-    setGeoLoading(true);
-    setGeoError("");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setCustomerCoords(coords);
-        setGeoLoading(false);
-        const result = calculateFee(coords.lat, coords.lng);
-        if (result) {
-          toast.success(`📍 ${result.distanceKm} km — Frete: R$ ${result.fee.toFixed(2)}`);
-        } else {
-          toast.error(OUT_OF_RANGE_MESSAGE);
-        }
-      },
-      (err) => {
-        setGeoLoading(false);
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            setGeoError("Permissão de localização negada. Ative nas configurações do navegador.");
-            break;
-          case err.POSITION_UNAVAILABLE:
-            setGeoError("Localização indisponível.");
-            break;
-          default:
-            setGeoError("Não foi possível obter sua localização.");
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+  const switchToRetirada = () => {
+    setDeliveryMode("retirada");
+    setSelectedNeighborhoodId("");
   };
 
   const switchToManual = () => {
     setDeliveryMode("manual");
-    setCustomerCoords(null);
-    setGeoError("");
   };
 
-  const switchToAuto = () => {
-    setDeliveryMode("auto");
-    setSelectedNeighborhoodId("");
+  // Auto-select neighborhood when choosing saved address
+  const handleSelectAddress = (addr: CustomerAddress) => {
+    setSelectedAddressId(addr.id);
+    setShowNewAddress(false);
+    setDeliveryMode("manual");
+
+    // Try to match neighborhood
+    const match = activeNeighborhoods.find(
+      (n) => n.name.toLowerCase().trim() === addr.neighborhood.toLowerCase().trim()
+    );
+    if (match) {
+      setSelectedNeighborhoodId(match.id);
+    }
   };
 
-  const switchToRetirada = () => {
-    setDeliveryMode("retirada");
-    setCustomerCoords(null);
-    setGeoError("");
-    setSelectedNeighborhoodId("");
+  // Delete address
+  const handleConfirmDeleteAddress = async () => {
+    if (!deleteAddrId) return;
+    const digits = phone.replace(/\D/g, "");
+    const success = await deleteAddress(deleteAddrId, digits);
+    if (success) {
+      if (selectedAddressId === deleteAddrId) {
+        setSelectedAddressId(null);
+        setSelectedNeighborhoodId("");
+      }
+      toast.success("Endereço removido!");
+    } else {
+      toast.error("Erro ao remover endereço.");
+    }
+    setDeleteAddrId(null);
   };
 
   // Phone lookup
@@ -163,7 +138,7 @@ const Checkout = () => {
       setName(found.name);
       toast.success(`Bem-vindo de volta, ${found.name}! 🎉`);
       if (found.addresses.length > 0) {
-        setSelectedAddressId(found.addresses[0].id);
+        handleSelectAddress(found.addresses[0]);
       }
     }
     setPhoneLocked(true);
@@ -171,7 +146,7 @@ const Checkout = () => {
   };
 
   const handleAddNewAddress = async () => {
-    const addrNeighborhood = deliveryMode === "manual" && selectedNeighborhood
+    const addrNeighborhood = selectedNeighborhood
       ? selectedNeighborhood.name
       : newAddress.neighborhood;
 
@@ -198,7 +173,7 @@ const Checkout = () => {
     if (success) {
       const updated = await lookupByPhone(digits);
       if (updated && updated.addresses.length > 0) {
-        setSelectedAddressId(updated.addresses[0].id);
+        handleSelectAddress(updated.addresses[0]);
       }
     }
     setShowNewAddress(false);
@@ -223,7 +198,7 @@ const Checkout = () => {
         neighborhood: "Retirada",
       };
     } else {
-      const addrNeighborhood = deliveryMode === "manual" && selectedNeighborhood
+      const addrNeighborhood = selectedNeighborhood
         ? selectedNeighborhood.name
         : (selectedAddress?.neighborhood || newAddress.neighborhood);
 
@@ -295,20 +270,23 @@ const Checkout = () => {
       .map((i) => `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}${i.notes ? `\n   _Obs: ${i.notes}_` : ""}`)
       .join("\n");
 
-    const paymentText =
-      payment === "pix" ? "PIX — Vou enviar o comprovante." : `Dinheiro${changeFor ? ` — Troco para R$ ${changeFor}` : ""}`;
+    const paymentLabel =
+      payment === "pix"
+        ? "PIX — Vou enviar o comprovante."
+        : payment === "cartao"
+          ? `Cartão (+6% taxa: R$ ${cardFee.toFixed(2)})`
+          : `Dinheiro${changeFor ? ` — Troco para R$ ${changeFor}` : ""}`;
 
     const deliveryInfo = isPickup
       ? "🏪 *Retirada no local* — Sem taxa de entrega"
-      : deliveryMode === "auto" && feeResultAuto
-        ? `📍 Distância: ${feeResultAuto.distanceKm} km\n🛵 Zona: ${feeResultAuto.zone.zone}`
-        : `📍 Bairro: ${finalAddress!.neighborhood}`;
+      : `📍 Bairro: ${finalAddress!.neighborhood}`;
 
     const addressBlock = isPickup
       ? `*Modalidade:* Retirada no local`
       : `*Endereço:*\n${finalAddress!.street}, ${finalAddress!.number}\nBairro: ${finalAddress!.neighborhood}${finalAddress!.reference ? `\nRef: ${finalAddress!.reference}` : ""}`;
 
     const feeLabel = isPickup ? "Retirada: Grátis" : `Taxa entrega: R$ ${deliveryFee.toFixed(2)}`;
+    const cardFeeLabel = payment === "cartao" ? `\nTaxa cartão (6%): R$ ${cardFee.toFixed(2)}` : "";
 
     const message = `*Pedido ${settings.name}* 🍣
 *Nº ${order.order_number}*
@@ -324,11 +302,11 @@ ${deliveryInfo}
 ${itemsText}
 
 Subtotal: R$ ${total.toFixed(2)}
-${feeLabel}
+${feeLabel}${cardFeeLabel}
 
 *Total: R$ ${grandTotal.toFixed(2)}*
 
-*Pagamento:* ${paymentText}`;
+*Pagamento:* ${paymentLabel}`;
 
     const encoded = encodeURIComponent(message);
     const whatsappPhone = settings.phone.replace(/\D/g, "");
@@ -351,6 +329,24 @@ ${feeLabel}
     <div className="min-h-screen bg-background pb-10">
       <Header />
       <div className="container py-4 space-y-6">
+
+        {/* Delete address confirmation dialog */}
+        <AlertDialog open={!!deleteAddrId} onOpenChange={(open) => !open && setDeleteAddrId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remover endereço?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Essa ação não pode ser desfeita. O endereço será removido permanentemente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmDeleteAddress} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Remover
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* WHATSAPP MESSAGE PREVIEW */}
         {whatsappMessage ? (
@@ -435,7 +431,7 @@ ${feeLabel}
           )}
         </div>
 
-        {/* STEP 2: Name + Location/Neighborhood + Address */}
+        {/* STEP 2: Name + Neighborhood + Address */}
         {step !== "phone" && (
           <>
             <div className="space-y-3 animate-fade-in">
@@ -450,7 +446,7 @@ ${feeLabel}
               />
             </div>
 
-            {/* Delivery Mode: Auto (GPS) or Manual (Neighborhood) */}
+            {/* Delivery Mode: Manual (Neighborhood) or Retirada */}
             <div className="space-y-3 animate-fade-in">
               <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <Navigation className="h-4 w-4 text-primary" /> Cálculo do Frete
@@ -458,16 +454,6 @@ ${feeLabel}
 
               {/* Mode toggle */}
               <div className="flex gap-2">
-                <button
-                  onClick={switchToAuto}
-                  className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
-                    deliveryMode === "auto"
-                      ? "gradient-red text-primary-foreground border-primary"
-                      : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
-                  }`}
-                >
-                  📍 Automática
-                </button>
                 <button
                   onClick={switchToManual}
                   className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
@@ -489,49 +475,6 @@ ${feeLabel}
                   🏪 Retirada
                 </button>
               </div>
-
-              {/* AUTO MODE */}
-              {deliveryMode === "auto" && (
-                <div className="space-y-3">
-                  <button
-                    onClick={handleGetLocation}
-                    disabled={geoLoading}
-                    className="w-full bg-secondary border border-border rounded-lg py-3 flex items-center justify-center gap-2 text-sm text-foreground hover:border-primary/50 transition-colors disabled:opacity-50"
-                  >
-                    {geoLoading ? (
-                      <><Loader2 className="h-4 w-4 animate-spin" /> Obtendo localização...</>
-                    ) : customerCoords ? (
-                      <><Check className="h-4 w-4 text-primary" /> Localização obtida — Atualizar</>
-                    ) : (
-                      <><Navigation className="h-4 w-4" /> Usar minha localização</>
-                    )}
-                  </button>
-                  {geoError && <p className="text-xs text-destructive">{geoError}</p>}
-                  {customerCoords && feeResultAuto && (
-                    <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
-                      <p className="text-sm font-bold text-primary">
-                        📍 {feeResultAuto.distanceKm} km — 🛵 Frete: R$ {feeResultAuto.fee.toFixed(2)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">Zona: {feeResultAuto.zone.zone} — {feeResultAuto.zone.description}</p>
-                    </div>
-                  )}
-                  {customerCoords && !feeResultAuto && (
-                    <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
-                      <p className="text-sm font-bold text-destructive">❌ {OUT_OF_RANGE_MESSAGE}</p>
-                      <p className="text-xs text-muted-foreground mt-1">Distância máxima: 5 km</p>
-                    </div>
-                  )}
-
-                  {/* Hint to switch to manual */}
-                  <button
-                    onClick={switchToManual}
-                    className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    Localização veio errada? Selecione seu bairro manualmente
-                  </button>
-                </div>
-              )}
 
               {/* MANUAL MODE */}
               {deliveryMode === "manual" && (
@@ -559,14 +502,6 @@ ${feeLabel}
                       )}
                     </div>
                   )}
-
-                  <button
-                    onClick={switchToAuto}
-                    className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <Navigation className="h-3.5 w-3.5" />
-                    Usar localização automática
-                  </button>
                 </div>
               )}
 
@@ -609,27 +544,33 @@ ${feeLabel}
               {currentCustomer && currentCustomer.addresses.length > 0 && (
                 <div className="space-y-2">
                   {currentCustomer.addresses.map((addr) => (
-                    <button
+                    <div
                       key={addr.id}
-                      onClick={() => {
-                        setSelectedAddressId(addr.id);
-                        setShowNewAddress(false);
-                      }}
-                      className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                      className={`relative w-full text-left p-3 rounded-lg border transition-colors cursor-pointer ${
                         selectedAddressId === addr.id
                           ? "border-primary bg-primary/10"
                           : "border-border bg-card hover:border-primary/50"
                       }`}
+                      onClick={() => handleSelectAddress(addr)}
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-bold text-foreground">{addr.label}</span>
-                        {selectedAddressId === addr.id && <Check className="h-4 w-4 text-primary" />}
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeleteAddrId(addr.id); }}
+                            className="p-1 rounded hover:bg-destructive/10 transition-colors"
+                            title="Remover endereço"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </button>
+                          {selectedAddressId === addr.id && <Check className="h-4 w-4 text-primary" />}
+                        </div>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {addr.street}, {addr.number} — {addr.neighborhood}
                       </p>
                       {addr.reference && <p className="text-xs text-muted-foreground">Ref: {addr.reference}</p>}
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -667,8 +608,8 @@ ${feeLabel}
                     onChange={(e) => setNewAddress((p) => ({ ...p, number: e.target.value }))}
                   />
 
-                  {/* Neighborhood: auto-filled in manual mode, free text in auto mode */}
-                  {deliveryMode === "manual" && selectedNeighborhood ? (
+                  {/* Neighborhood: auto-filled in manual mode */}
+                  {selectedNeighborhood ? (
                     <div className="bg-secondary border border-border rounded-lg px-4 py-3 text-sm text-foreground opacity-70">
                       Bairro: {selectedNeighborhood.name}
                     </div>
@@ -710,8 +651,8 @@ ${feeLabel}
             {/* Payment */}
             <div className="space-y-3 animate-fade-in">
               <h2 className="text-sm font-bold text-foreground">Forma de Pagamento</h2>
-              <div className="flex gap-3">
-                {(["pix", "dinheiro"] as const).map((p) => (
+              <div className="flex gap-2">
+                {(["pix", "dinheiro", "cartao"] as const).map((p) => (
                   <button
                     key={p}
                     onClick={() => setPayment(p)}
@@ -721,7 +662,7 @@ ${feeLabel}
                         : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
                     }`}
                   >
-                    {p === "pix" ? "PIX" : "Dinheiro"}
+                    {p === "pix" ? "PIX" : p === "dinheiro" ? "Dinheiro" : "Cartão"}
                   </button>
                 ))}
               </div>
@@ -768,6 +709,22 @@ ${feeLabel}
                   onChange={(e) => setChangeFor(e.target.value)}
                 />
               )}
+
+              {payment === "cartao" && (
+                <div className="bg-card border border-border rounded-lg p-4 space-y-2">
+                  <p className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <CreditCard className="h-4 w-4 text-primary" /> Pagamento no Cartão
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Pagamentos no cartão possuem acréscimo de <strong>6%</strong> sobre o valor total do pedido.
+                  </p>
+                  <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+                    <p className="text-sm font-bold text-primary">
+                      Taxa do cartão: R$ {cardFee.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Summary */}
@@ -798,6 +755,12 @@ ${feeLabel}
                         : "Selecione o frete"}
                   </span>
                 </div>
+                {payment === "cartao" && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Taxa cartão (6%)</span>
+                    <span className="text-foreground">R$ {cardFee.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="border-t border-border pt-2 flex justify-between font-bold">
                   <span className="text-foreground">Total</span>
                   <span className="text-primary">R$ {grandTotal.toFixed(2)}</span>
