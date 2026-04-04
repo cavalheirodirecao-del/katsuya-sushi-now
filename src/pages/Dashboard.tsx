@@ -482,6 +482,8 @@ const Dashboard = () => {
         {tab === "bairros" && (
           <div className="space-y-4 animate-fade-in">
             <h3 className="text-sm font-bold text-foreground">📍 Pedidos por Bairro (Mês)</h3>
+
+            {/* Totais gerais */}
             <div className="bg-card border border-border rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground font-bold">Frete hoje</span>
@@ -492,17 +494,42 @@ const Dashboard = () => {
                 <span className="text-foreground font-bold">R$ {sumDeliveryFees(ordersThisMonth).toFixed(2)}</span>
               </div>
             </div>
+
+            {/* Header da tabela */}
+            {neighborhoods.length > 0 && (
+              <div className="grid grid-cols-4 gap-1 px-3 text-xs text-muted-foreground font-bold">
+                <span className="col-span-1">Bairro</span>
+                <span className="text-center">Pedidos</span>
+                <span className="text-right">Produtos</span>
+                <span className="text-right">Frete</span>
+              </div>
+            )}
+
             {neighborhoods.length === 0 && <p className="text-muted-foreground text-center py-8 text-sm">Sem dados.</p>}
-            {neighborhoods.map((n) => (
-              <div
-                key={n.name}
-                className="bg-card border border-border rounded-lg p-3 flex items-center justify-between"
-              >
-                <div>
-                  <p className="text-sm font-medium text-foreground">{n.name}</p>
-                  <p className="text-xs text-muted-foreground">{n.orders} pedidos</p>
+
+            {neighborhoods.map((n, i) => (
+              <div key={n.name} className="bg-card border border-border rounded-lg p-3">
+                <div className="grid grid-cols-4 gap-1 items-center">
+                  {/* Nome + ranking */}
+                  <div className="col-span-1 flex items-center gap-1.5 min-w-0">
+                    <span className={`text-xs font-bold shrink-0 ${i < 3 ? "text-primary" : "text-muted-foreground"}`}>
+                      {i + 1}º
+                    </span>
+                    <p className="text-xs font-medium text-foreground truncate">{n.name}</p>
+                  </div>
+                  {/* Pedidos */}
+                  <div className="text-center">
+                    <span className="text-sm font-bold text-foreground">{n.orders}</span>
+                  </div>
+                  {/* Produtos */}
+                  <div className="text-right">
+                    <span className="text-xs font-semibold text-foreground">R$ {n.subtotal.toFixed(2)}</span>
+                  </div>
+                  {/* Frete */}
+                  <div className="text-right">
+                    <span className="text-xs font-semibold text-primary">R$ {n.deliveryFees.toFixed(2)}</span>
+                  </div>
                 </div>
-                <span className="text-sm font-bold text-primary">R$ {n.revenue.toFixed(2)}</span>
               </div>
             ))}
           </div>
