@@ -168,16 +168,10 @@ export const useOrdersDB = () => {
 
   const today = new Date();
 
-  // Offset UTC-3 (Brasil) — converte created_at UTC para horário local BRT
-  const toBRT = (utcStr: string): Date => {
-    const utc = parseISO(utcStr);
-    return new Date(utc.getTime() - 3 * 60 * 60 * 1000);
-  };
-
   const filterByRange = useCallback(
     (from: Date, to: Date) => {
       return orders.filter((o) => {
-        const d = toBRT(o.created_at);
+        const d = parseISO(o.created_at);
         return isWithinInterval(d, { start: from, end: to });
       });
     },
@@ -236,11 +230,15 @@ export const useOrdersDB = () => {
   };
 
   const neighborhoodStats = (list: OrderDB[]) => {
-    const map = new Map<string, { orders: number; revenue: number }>();
+    const map = new Map<string, { orders: number; subtotal: number; deliveryFees: number }>();
     active(list).forEach((o) => {
       const n = o.address_neighborhood;
-      const prev = map.get(n) || { orders: 0, revenue: 0 };
-      map.set(n, { orders: prev.orders + 1, revenue: prev.revenue + Number(o.total) });
+      const prev = map.get(n) || { orders: 0, subtotal: 0, deliveryFees: 0 };
+      map.set(n, {
+        orders: prev.orders + 1,
+        subtotal: prev.subtotal + Number(o.subtotal),
+        deliveryFees: prev.deliveryFees + Number(o.delivery_fee),
+      });
     });
     return Array.from(map.entries())
       .map(([name, data]) => ({ name, ...data }))
