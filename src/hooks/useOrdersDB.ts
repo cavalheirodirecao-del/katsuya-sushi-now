@@ -168,10 +168,16 @@ export const useOrdersDB = () => {
 
   const today = new Date();
 
+  // Offset UTC-3 (Brasil) — converte created_at UTC para horário local BRT
+  const toBRT = (utcStr: string): Date => {
+    const utc = parseISO(utcStr);
+    return new Date(utc.getTime() - 3 * 60 * 60 * 1000);
+  };
+
   const filterByRange = useCallback(
     (from: Date, to: Date) => {
       return orders.filter((o) => {
-        const d = parseISO(o.created_at);
+        const d = toBRT(o.created_at);
         return isWithinInterval(d, { start: from, end: to });
       });
     },
