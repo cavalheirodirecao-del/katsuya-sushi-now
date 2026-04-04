@@ -87,19 +87,10 @@ const OrderCard = ({
 
   const handleAdvance = (nextSt: OrderStatus) => {
     onStatusChange(order.id, nextSt);
-    // Abre WhatsApp automaticamente após avançar status
-    const msg = getWhatsAppMessage(order, nextSt);
-    if (msg) {
-      setTimeout(() => openWhatsApp(order.customer_phone, msg), 500);
-    }
   };
 
   const handleCancel = () => {
     onStatusChange(order.id, "cancelado");
-    const msg = getWhatsAppMessage(order, "cancelado");
-    if (msg) {
-      setTimeout(() => openWhatsApp(order.customer_phone, msg), 500);
-    }
   };
 
   // Botão manual para reenviar notificação do status atual
@@ -248,29 +239,50 @@ const OrderCard = ({
 
 export const OrderKanban = ({ orders, onStatusChange }: OrderKanbanProps) => {
   const activeStatuses: OrderStatus[] = ["pendente", "confirmado", "preparando", "saiu_entrega"];
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  const toggleCollapse = (status: string) => {
+    setCollapsed((prev) => ({ ...prev, [status]: !prev[status] }));
+  };
 
   return (
     <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-4 lg:gap-4">
       {activeStatuses.map((status) => {
         const config = STATUS_CONFIG.find((s) => s.status === status)!;
         const statusOrders = orders.filter((o) => o.status === status);
+        const isCollapsed = collapsed[status] ?? false;
 
         return (
           <div key={status} className="space-y-2">
-            <div className={cn("flex items-center justify-between px-3 py-2 rounded-lg border", config.color)}>
+            {/* Header clicável para colapsar */}
+            <button
+              onClick={() => toggleCollapse(status)}
+              className={cn(
+                "w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-opacity",
+                config.color,
+                isCollapsed && "opacity-60",
+              )}
+            >
               <span className="font-bold text-sm">
                 {config.emoji} {config.label}
               </span>
-              <span className="text-xs bg-background/50 px-2 py-0.5 rounded-full">{statusOrders.length}</span>
-            </div>
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto scrollbar-hide">
-              {statusOrders.length === 0 && (
-                <p className="text-center text-xs text-muted-foreground py-8">Nenhum pedido</p>
-              )}
-              {statusOrders.map((order) => (
-                <OrderCard key={order.id} order={order} onStatusChange={onStatusChange} />
-              ))}
-            </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs bg-background/50 px-2 py-0.5 rounded-full">{statusOrders.length}</span>
+                {isCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+              </div>
+            </button>
+
+            {/* Lista — esconde quando colapsado */}
+            {!isCollapsed && (
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto scrollbar-hide">
+                {statusOrders.length === 0 && (
+                  <p className="text-center text-xs text-muted-foreground py-8">Nenhum pedido</p>
+                )}
+                {statusOrders.map((order) => (
+                  <OrderCard key={order.id} order={order} onStatusChange={onStatusChange} />
+                ))}
+              </div>
+            )}
           </div>
         );
       })}
