@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, parseISO, isWithinInterval, format
-} from "date-fns";
+import { startOfDay, endOfDay, subDays, startOfMonth, endOfMonth, parseISO, isWithinInterval, format } from "date-fns";
 
 export type OrderStatus = "pendente" | "confirmado" | "preparando" | "saiu_entrega" | "entregue" | "cancelado";
 export type PaymentMethod = "pix" | "dinheiro" | "cartao";
@@ -30,6 +28,7 @@ export interface OrderDB {
   address_reference: string | null;
   subtotal: number;
   delivery_fee: number;
+  card_fee: number;
   total: number;
   payment_method: PaymentMethod;
   status: OrderStatus;
@@ -53,14 +52,10 @@ export const useOrdersDB = () => {
       return;
     }
 
-    // Fetch items for all orders
     const orderIds = ordersData?.map((o) => o.id) || [];
-    
+
     if (orderIds.length > 0) {
-      const { data: itemsData } = await supabase
-        .from("order_items")
-        .select("*")
-        .in("order_id", orderIds);
+      const { data: itemsData } = await supabase.from("order_items").select("*").in("order_id", orderIds);
 
       const itemsByOrder = new Map<string, OrderItemDB[]>();
       itemsData?.forEach((item) => {
@@ -70,6 +65,7 @@ export const useOrdersDB = () => {
 
       const ordersWithItems = ordersData?.map((order) => ({
         ...order,
+        card_fee: Number(order.card_fee ?? 0),
         items: itemsByOrder.get(order.id) || [],
       })) as OrderDB[];
 
@@ -81,19 +77,14 @@ export const useOrdersDB = () => {
     setLoading(false);
   }, []);
 
-  // Subscribe to realtime updates
   useEffect(() => {
     fetchOrders();
 
     const channel = supabase
       .channel("orders-realtime")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "orders" },
-        () => {
-          fetchOrders();
-        }
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        fetchOrders();
+      })
       .subscribe();
 
     return () => {
@@ -102,10 +93,7 @@ export const useOrdersDB = () => {
   }, [fetchOrders]);
 
   const updateStatus = async (id: string, status: OrderStatus) => {
-    const { error } = await supabase
-      .from("orders")
-      .update({ status })
-      .eq("id", id);
+    const { error } = await supabase.from("orders").update({ status }).eq("id", id);
 
     if (error) {
       console.error("Error updating order status:", error);
@@ -116,7 +104,6 @@ export const useOrdersDB = () => {
     return true;
   };
 
-  // Create new order (for checkout)
   const createOrder = async (
     customerName: string,
     customerPhone: string,
@@ -129,8 +116,9 @@ export const useOrdersDB = () => {
     items: { productId?: string; name: string; quantity: number; price: number; flavor?: string; notes?: string }[],
     subtotal: number,
     deliveryFee: number,
+    cardFee: number,
     total: number,
-    paymentMethod: PaymentMethod
+    paymentMethod: PaymentMethod,
   ): Promise<OrderDB | null> => {
     const orderNumber = `PED-${Date.now().toString(36).toUpperCase()}`;
 
@@ -146,6 +134,7 @@ export const useOrdersDB = () => {
         address_reference: address.reference || null,
         subtotal,
         delivery_fee: deliveryFee,
+        card_fee: cardFee,
         total,
         payment_method: paymentMethod,
         status: "pendente" as OrderStatus,
@@ -158,7 +147,6 @@ export const useOrdersDB = () => {
       return null;
     }
 
-    // Insert order items
     const orderItems = items.map((item) => ({
       order_id: orderData.id,
       product_id: item.productId || null,
@@ -169,74 +157,81 @@ export const useOrdersDB = () => {
       notes: item.notes || null,
     }));
 
-    const { error: itemsError } = await supabase
-      .from("order_items")
-      .insert(orderItems);
+    const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
 
     if (itemsError) {
       console.error("Error creating order items:", itemsError);
     }
 
-
     return orderData as OrderDB;
   };
 
-  // Filters
   const today = new Date();
 
-  const filterByRange = useCallback((from: Date, to: Date) => {
-    return orders.filter((o) => {
-      const d = parseISO(o.created_at);
-      return isWithinInterval(d, { start: from, end: to });
-    });
-  }, [orders]);
+  const filterByRange = useCallback(
+    (from: Date, to: Date) => {
+      return orders.filter((o) => {
+        const d = parseISO(o.created_at);
+        return isWithinInterval(d, { start: from, end: to });
+      });
+    },
+    [orders],
+  );
 
-  const filterByStatus = useCallback((status: OrderStatus) => {
-    return orders.filter((o) => o.status === status);
-  }, [orders]);
+  const filterByStatus = useCallback(
+    (status: OrderStatus) => {
+      return orders.filter((o) => o.status === status);
+    },
+    [orders],
+  );
 
   const ordersToday = filterByRange(startOfDay(today), endOfDay(today));
   const ordersYesterday = filterByRange(startOfDay(subDays(today, 1)), endOfDay(subDays(today, 1)));
   const ordersLast7 = filterByRange(startOfDay(subDays(today, 6)), endOfDay(today));
   const ordersThisMonth = filterByRange(startOfMonth(today), endOfMonth(today));
 
-  // KPIs
-  const sumTotal = (list: OrderDB[]) => list.reduce((s, o) => s + Number(o.total), 0);
-  const sumSubtotal = (list: OrderDB[]) => list.reduce((s, o) => s + Number(o.subtotal), 0);
-  const sumDeliveryFees = (list: OrderDB[]) => list.reduce((s, o) => s + Number(o.delivery_fee), 0);
-  const avgTicket = (list: OrderDB[]) => list.length ? sumTotal(list) / list.length : 0;
-  const uniqueCustomers = (list: OrderDB[]) => new Set(list.map((o) => o.customer_phone)).size;
-  const totalItemsSold = (list: OrderDB[]) => 
-    list.reduce((s, o) => s + (o.items?.reduce((ss, i) => ss + i.quantity, 0) || 0), 0);
+  // KPIs — todos excluem cancelados por padrão
+  const active = (list: OrderDB[]) => list.filter((o) => o.status !== "cancelado");
 
-  // Product ranking
+  const sumTotal = (list: OrderDB[]) => active(list).reduce((s, o) => s + Number(o.total), 0);
+  const sumSubtotal = (list: OrderDB[]) => active(list).reduce((s, o) => s + Number(o.subtotal), 0);
+  const sumDeliveryFees = (list: OrderDB[]) => active(list).reduce((s, o) => s + Number(o.delivery_fee), 0);
+  const sumCardFees = (list: OrderDB[]) => active(list).reduce((s, o) => s + Number(o.card_fee ?? 0), 0);
+  const avgTicket = (list: OrderDB[]) => (active(list).length ? sumTotal(list) / active(list).length : 0);
+  const uniqueCustomers = (list: OrderDB[]) => new Set(active(list).map((o) => o.customer_phone)).size;
+  const totalItemsSold = (list: OrderDB[]) =>
+    active(list).reduce((s, o) => s + (o.items?.reduce((ss, i) => ss + i.quantity, 0) || 0), 0);
+
   const productRanking = (list: OrderDB[]) => {
     const map = new Map<string, { qty: number; revenue: number }>();
-    list.forEach((o) =>
+    active(list).forEach((o) =>
       o.items?.forEach((i) => {
         const prev = map.get(i.product_name) || { qty: 0, revenue: 0 };
         map.set(i.product_name, { qty: prev.qty + i.quantity, revenue: prev.revenue + Number(i.price) * i.quantity });
-      })
+      }),
     );
     return Array.from(map.entries())
       .map(([name, data]) => ({ name, ...data }))
       .sort((a, b) => b.qty - a.qty);
   };
 
-  // Top customers
   const topCustomers = (list: OrderDB[]) => {
     const map = new Map<string, { name: string; phone: string; orders: number; total: number }>();
-    list.forEach((o) => {
+    active(list).forEach((o) => {
       const prev = map.get(o.customer_phone) || { name: o.customer_name, phone: o.customer_phone, orders: 0, total: 0 };
-      map.set(o.customer_phone, { ...prev, name: o.customer_name, orders: prev.orders + 1, total: prev.total + Number(o.total) });
+      map.set(o.customer_phone, {
+        ...prev,
+        name: o.customer_name,
+        orders: prev.orders + 1,
+        total: prev.total + Number(o.total),
+      });
     });
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
   };
 
-  // Neighborhood stats
   const neighborhoodStats = (list: OrderDB[]) => {
     const map = new Map<string, { orders: number; revenue: number }>();
-    list.forEach((o) => {
+    active(list).forEach((o) => {
       const n = o.address_neighborhood;
       const prev = map.get(n) || { orders: 0, revenue: 0 };
       map.set(n, { orders: prev.orders + 1, revenue: prev.revenue + Number(o.total) });
@@ -246,14 +241,22 @@ export const useOrdersDB = () => {
       .sort((a, b) => b.orders - a.orders);
   };
 
-  // Payment stats
   const paymentStats = (list: OrderDB[]) => {
-    const pix = list.filter((o) => o.payment_method === "pix");
-    const cash = list.filter((o) => o.payment_method === "dinheiro");
-    return { pix: sumTotal(pix), cash: sumTotal(cash), pixCount: pix.length, cashCount: cash.length };
+    const activeList = active(list);
+    const pix = activeList.filter((o) => o.payment_method === "pix");
+    const cash = activeList.filter((o) => o.payment_method === "dinheiro");
+    const card = activeList.filter((o) => o.payment_method === "cartao");
+    return {
+      pix: pix.reduce((s, o) => s + Number(o.total), 0),
+      pixCount: pix.length,
+      cash: cash.reduce((s, o) => s + Number(o.total), 0),
+      cashCount: cash.length,
+      card: card.reduce((s, o) => s + Number(o.total), 0),
+      cardCount: card.length,
+      cardFees: card.reduce((s, o) => s + Number(o.card_fee ?? 0), 0),
+    };
   };
 
-  // Daily sales for chart
   const dailySales = (days: number) => {
     const result: { date: string; total: number; orders: number }[] = [];
     for (let i = days - 1; i >= 0; i--) {
@@ -262,17 +265,35 @@ export const useOrdersDB = () => {
       result.push({
         date: format(day, "dd/MM"),
         total: sumTotal(dayOrders),
-        orders: dayOrders.length,
+        orders: active(dayOrders).length,
       });
     }
     return result;
   };
 
   return {
-    orders, loading, refresh: fetchOrders, updateStatus, createOrder,
-    ordersToday, ordersYesterday, ordersLast7, ordersThisMonth,
-    filterByRange, filterByStatus,
-    sumTotal, sumSubtotal, sumDeliveryFees, avgTicket, uniqueCustomers, totalItemsSold,
-    productRanking, topCustomers, neighborhoodStats, paymentStats, dailySales,
+    orders,
+    loading,
+    refresh: fetchOrders,
+    updateStatus,
+    createOrder,
+    ordersToday,
+    ordersYesterday,
+    ordersLast7,
+    ordersThisMonth,
+    filterByRange,
+    filterByStatus,
+    sumTotal,
+    sumSubtotal,
+    sumDeliveryFees,
+    sumCardFees,
+    avgTicket,
+    uniqueCustomers,
+    totalItemsSold,
+    productRanking,
+    topCustomers,
+    neighborhoodStats,
+    paymentStats,
+    dailySales,
   };
 };
