@@ -2,7 +2,7 @@ import { useState } from "react";
 import { OrderDB, OrderStatus } from "@/hooks/useOrdersDB";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Phone, MapPin, Clock, ChevronDown, ChevronUp, Package } from "lucide-react";
+import { Phone, MapPin, Clock, ChevronDown, ChevronUp, Package, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface OrderKanbanProps {
@@ -11,19 +11,66 @@ interface OrderKanbanProps {
 }
 
 const STATUS_CONFIG: { status: OrderStatus; label: string; emoji: string; color: string }[] = [
-  { status: "pendente", label: "Pendente", emoji: "⏳", color: "bg-yellow-500/20 border-yellow-500/50 text-yellow-400" },
-  { status: "confirmado", label: "Confirmado", emoji: "✅", color: "bg-green-500/20 border-green-500/50 text-green-400" },
+  {
+    status: "pendente",
+    label: "Pendente",
+    emoji: "⏳",
+    color: "bg-yellow-500/20 border-yellow-500/50 text-yellow-400",
+  },
+  {
+    status: "confirmado",
+    label: "Confirmado",
+    emoji: "✅",
+    color: "bg-green-500/20 border-green-500/50 text-green-400",
+  },
   { status: "preparando", label: "Preparando", emoji: "🍣", color: "bg-blue-500/20 border-blue-500/50 text-blue-400" },
-  { status: "saiu_entrega", label: "Em Rota", emoji: "🛵", color: "bg-purple-500/20 border-purple-500/50 text-purple-400" },
-  { status: "entregue", label: "Entregue", emoji: "📦", color: "bg-emerald-500/20 border-emerald-500/50 text-emerald-400" },
+  {
+    status: "saiu_entrega",
+    label: "Em Rota",
+    emoji: "🛵",
+    color: "bg-purple-500/20 border-purple-500/50 text-purple-400",
+  },
+  {
+    status: "entregue",
+    label: "Entregue",
+    emoji: "📦",
+    color: "bg-emerald-500/20 border-emerald-500/50 text-emerald-400",
+  },
   { status: "cancelado", label: "Cancelado", emoji: "❌", color: "bg-red-500/20 border-red-500/50 text-red-400" },
 ];
 
-const OrderCard = ({ 
-  order, 
-  onStatusChange 
-}: { 
-  order: OrderDB; 
+// Mensagem WhatsApp por status
+const getWhatsAppMessage = (order: OrderDB, status: OrderStatus): string | null => {
+  const nome = order.customer_name.trim().split(" ")[0]; // primeiro nome
+  const pedido = order.order_number;
+
+  switch (status) {
+    case "confirmado":
+      return `Olá ${nome}! 😊 Seu pedido *${pedido}* foi *confirmado* e já está sendo preparado com carinho. Em breve sairá para entrega! 🍣`;
+    case "preparando":
+      return `Olá ${nome}! 🍣 Seu pedido *${pedido}* está sendo *preparado* agora. Logo logo estará a caminho!`;
+    case "saiu_entrega":
+      return `Olá ${nome}! 🛵 Seu pedido *${pedido}* *saiu para entrega* e está a caminho! Fique de olho. 📍`;
+    case "entregue":
+      return `Olá ${nome}! 📦 Seu pedido *${pedido}* foi *entregue*! Esperamos que aproveite muito. Obrigado pela preferência! 🙏`;
+    case "cancelado":
+      return `Olá ${nome}, infelizmente seu pedido *${pedido}* precisou ser *cancelado*. Entre em contato conosco para mais informações. 😔`;
+    default:
+      return null;
+  }
+};
+
+const openWhatsApp = (phone: string, message: string) => {
+  const digits = phone.replace(/\D/g, "");
+  const encoded = encodeURIComponent(message);
+  window.open(`https://wa.me/55${digits}?text=${encoded}`, "_blank");
+};
+
+const OrderCard = ({
+  order,
+  onStatusChange,
+}: {
+  order: OrderDB;
   onStatusChange: (id: string, status: OrderStatus) => void;
 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -38,11 +85,28 @@ const OrderCard = ({
 
   const next = nextStatus();
 
+  const handleAdvance = (nextSt: OrderStatus) => {
+    onStatusChange(order.id, nextSt);
+    // Abre WhatsApp automaticamente após avançar status
+    const msg = getWhatsAppMessage(order, nextSt);
+    if (msg) {
+      setTimeout(() => openWhatsApp(order.customer_phone, msg), 500);
+    }
+  };
+
+  const handleCancel = () => {
+    onStatusChange(order.id, "cancelado");
+    const msg = getWhatsAppMessage(order, "cancelado");
+    if (msg) {
+      setTimeout(() => openWhatsApp(order.customer_phone, msg), 500);
+    }
+  };
+
+  // Botão manual para reenviar notificação do status atual
+  const currentMsg = getWhatsAppMessage(order, order.status);
+
   return (
-    <div className={cn(
-      "bg-card border rounded-lg p-3 space-y-2 transition-all",
-      statusConfig.color.split(" ")[1]
-    )}>
+    <div className={cn("bg-card border rounded-lg p-3 space-y-2 transition-all", statusConfig.color.split(" ")[1])}>
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -60,10 +124,23 @@ const OrderCard = ({
 
       {/* Contact & Address */}
       <div className="space-y-1">
-        <p className="text-xs text-muted-foreground flex items-center gap-1">
-          <Phone className="h-3 w-3" />
-          {order.customer_phone}
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <Phone className="h-3 w-3" />
+            {order.customer_phone}
+          </p>
+          {/* Botão reenviar WhatsApp manual */}
+          {currentMsg && order.status !== "pendente" && (
+            <button
+              onClick={() => openWhatsApp(order.customer_phone, currentMsg)}
+              className="flex items-center gap-1 text-xs text-green-400 hover:text-green-300 transition-colors"
+              title="Reenviar notificação WhatsApp"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              <span>Avisar</span>
+            </button>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground flex items-center gap-1">
           <MapPin className="h-3 w-3" />
           {order.address_neighborhood}
@@ -71,7 +148,7 @@ const OrderCard = ({
       </div>
 
       {/* Items summary */}
-      <div 
+      <div
         onClick={() => setExpanded(!expanded)}
         className="flex items-center justify-between cursor-pointer hover:bg-secondary/50 rounded px-1 py-0.5 -mx-1"
       >
@@ -79,7 +156,11 @@ const OrderCard = ({
           <Package className="h-3 w-3" />
           {order.items?.reduce((sum, i) => sum + i.quantity, 0) || 0} itens
         </span>
-        {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+        {expanded ? (
+          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        )}
       </div>
 
       {/* Expanded items */}
@@ -96,9 +177,13 @@ const OrderCard = ({
           ))}
           {order.items.some((i) => i.notes) && (
             <div className="mt-1 pt-1 border-t border-border">
-              {order.items.filter((i) => i.notes).map((item) => (
-                <p key={item.id} className="text-xs text-yellow-400">📝 {item.product_name}: {item.notes}</p>
-              ))}
+              {order.items
+                .filter((i) => i.notes)
+                .map((item) => (
+                  <p key={item.id} className="text-xs text-yellow-400">
+                    📝 {item.product_name}: {item.notes}
+                  </p>
+                ))}
             </div>
           )}
           <div className="mt-2 pt-1 border-t border-border text-xs">
@@ -110,16 +195,28 @@ const OrderCard = ({
               <span>Entrega</span>
               <span>R$ {Number(order.delivery_fee).toFixed(2)}</span>
             </div>
+            {Number(order.card_fee ?? 0) > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>Taxa cartão</span>
+                <span>R$ {Number(order.card_fee).toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between font-bold text-foreground">
               <span>Total</span>
               <span>R$ {Number(order.total).toFixed(2)}</span>
             </div>
           </div>
           <div className="pt-1">
-            <span className={cn(
-              "text-xs px-2 py-0.5 rounded-full uppercase font-medium",
-              order.payment_method === "pix" ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"
-            )}>
+            <span
+              className={cn(
+                "text-xs px-2 py-0.5 rounded-full uppercase font-medium",
+                order.payment_method === "pix"
+                  ? "bg-green-500/20 text-green-400"
+                  : order.payment_method === "cartao"
+                    ? "bg-blue-500/20 text-blue-400"
+                    : "bg-yellow-500/20 text-yellow-400",
+              )}
+            >
               {order.payment_method}
             </span>
           </div>
@@ -129,16 +226,17 @@ const OrderCard = ({
       {/* Actions */}
       {next && (
         <button
-          onClick={() => onStatusChange(order.id, next)}
+          onClick={() => handleAdvance(next)}
           className="w-full mt-2 py-2 rounded-lg text-xs font-bold gradient-red text-primary-foreground transition-transform active:scale-95"
         >
-          {STATUS_CONFIG.find((s) => s.status === next)?.emoji} Avançar para {STATUS_CONFIG.find((s) => s.status === next)?.label}
+          {STATUS_CONFIG.find((s) => s.status === next)?.emoji} Avançar para{" "}
+          {STATUS_CONFIG.find((s) => s.status === next)?.label}
         </button>
       )}
 
       {order.status !== "cancelado" && order.status !== "entregue" && (
         <button
-          onClick={() => onStatusChange(order.id, "cancelado")}
+          onClick={handleCancel}
           className="w-full py-1.5 rounded-lg text-xs text-red-400 hover:bg-red-500/10 transition-colors"
         >
           Cancelar pedido
@@ -149,7 +247,6 @@ const OrderCard = ({
 };
 
 export const OrderKanban = ({ orders, onStatusChange }: OrderKanbanProps) => {
-  // Mobile: vertical, Desktop: horizontal
   const activeStatuses: OrderStatus[] = ["pendente", "confirmado", "preparando", "saiu_entrega"];
 
   return (
@@ -160,22 +257,15 @@ export const OrderKanban = ({ orders, onStatusChange }: OrderKanbanProps) => {
 
         return (
           <div key={status} className="space-y-2">
-            <div className={cn(
-              "flex items-center justify-between px-3 py-2 rounded-lg border",
-              config.color
-            )}>
+            <div className={cn("flex items-center justify-between px-3 py-2 rounded-lg border", config.color)}>
               <span className="font-bold text-sm">
                 {config.emoji} {config.label}
               </span>
-              <span className="text-xs bg-background/50 px-2 py-0.5 rounded-full">
-                {statusOrders.length}
-              </span>
+              <span className="text-xs bg-background/50 px-2 py-0.5 rounded-full">{statusOrders.length}</span>
             </div>
             <div className="space-y-2 max-h-[60vh] overflow-y-auto scrollbar-hide">
               {statusOrders.length === 0 && (
-                <p className="text-center text-xs text-muted-foreground py-8">
-                  Nenhum pedido
-                </p>
+                <p className="text-center text-xs text-muted-foreground py-8">Nenhum pedido</p>
               )}
               {statusOrders.map((order) => (
                 <OrderCard key={order.id} order={order} onStatusChange={onStatusChange} />
