@@ -21,7 +21,7 @@ export interface Order {
   subtotal: number;
   deliveryFee: number;
   total: number;
-  paymentMethod: "pix" | "dinheiro";
+  paymentMethod: "pix" | "dinheiro" | "cartao";
   status: "pendente" | "confirmado" | "preparando" | "saiu_entrega" | "entregue" | "cancelado";
 }
 
@@ -55,7 +55,7 @@ export const createOrderFromCheckout = (
   subtotal: number,
   deliveryFee: number,
   total: number,
-  paymentMethod: "pix" | "dinheiro"
+  paymentMethod: "pix" | "dinheiro" | "cartao",
 ): Order => {
   return {
     id: `PED-${Date.now().toString(36).toUpperCase()}`,
