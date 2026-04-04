@@ -343,7 +343,6 @@ ${feeLabel}
     navigate("/");
     toast.success("Pedido enviado! Verifique o WhatsApp.");
   };
-  };
 
   const inputClass =
     "w-full bg-secondary border border-border rounded-lg px-4 py-3 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50";
