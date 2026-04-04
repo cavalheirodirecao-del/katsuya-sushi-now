@@ -65,7 +65,7 @@ export const useOrdersDB = () => {
 
       const ordersWithItems = ordersData?.map((order) => ({
         ...order,
-        card_fee: Number(order.card_fee ?? 0),
+        card_fee: Number((order as any).card_fee ?? 0),
         items: itemsByOrder.get(order.id) || [],
       })) as OrderDB[];
 
