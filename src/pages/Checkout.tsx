@@ -1,31 +1,14 @@
-// 🔥 MANTÉM SEU IMPORT ORIGINAL (NÃO MEXER)
 import { useState, useMemo } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useNavigate } from "react-router-dom";
 import { useNeighborhoodsDB } from "@/hooks/useNeighborhoodsDB";
-import { useCustomers, CustomerAddress } from "@/hooks/useCustomers";
+import { useCustomers } from "@/hooks/useCustomers";
 import { useOrdersDB, PaymentMethod } from "@/hooks/useOrdersDB";
 import { useCompanySettings } from "@/hooks/useCompanySettings";
 
 import Header from "@/components/Header";
 import { toast } from "sonner";
-import {
-  MessageCircle,
-  Copy,
-  User,
-  MapPin,
-  Plus,
-  Check,
-  Phone,
-  Navigation,
-  Loader2,
-  ArrowLeft,
-  ExternalLink,
-  Trash2,
-  CreditCard,
-} from "lucide-react";
 
-// 🔥 FUNÇÃO TELEFONE
 const formatPhone = (value: string) => {
   const digits = value.replace(/\D/g, "").slice(0, 11);
   if (digits.length <= 2) return digits;
@@ -38,7 +21,7 @@ type DeliveryMode = "manual" | "retirada";
 const Checkout = () => {
   const { items, total, clearCart } = useCart();
   const { activeNeighborhoods } = useNeighborhoodsDB();
-  const { currentCustomer, lookupByPhone } = useCustomers();
+  const { lookupByPhone } = useCustomers();
   const { createOrder } = useOrdersDB();
   const { settings } = useCompanySettings();
   const navigate = useNavigate();
@@ -89,16 +72,40 @@ const Checkout = () => {
         ? { street: "Retirada", number: "-", neighborhood: "Retirada" }
         : { street: "-", number: "-", neighborhood: selectedNeighborhood?.name || "" };
 
+    // 🔥 CORREÇÃO PRINCIPAL AQUI
+    const orderItems = items.map((i) => ({
+      productId: i.product.id,
+      name: i.product.name,
+      quantity: i.quantity,
+      price: i.product.price,
+      flavor: i.flavor,
+      notes: i.notes,
+    }));
+
     setSubmitting(true);
 
-    const order = await createOrder(name, digits, address, items, total, deliveryFee, grandTotal, payment);
+    const order = await createOrder(
+      name,
+      digits,
+      address,
+      orderItems, // ✅ agora correto
+      total,
+      deliveryFee,
+      grandTotal,
+      payment,
+    );
 
     if (!order) {
       setSubmitting(false);
       return toast.error("Erro ao criar pedido");
     }
 
-    const paymentLabel = payment === "pix" ? "PIX" : payment === "cartao" ? `Cartão (+6%)` : "Dinheiro";
+    const paymentLabel =
+      payment === "pix"
+        ? "PIX"
+        : payment === "cartao"
+          ? `Cartão (+6%)`
+          : `Dinheiro${changeFor ? ` (Troco: ${changeFor})` : ""}`;
 
     const message = `Pedido ${settings.name}
 Nome: ${name}
