@@ -46,46 +46,34 @@ type DeliveryMode = "manual" | "retirada";
 
 const Checkout = () => {
   const { items, total, clearCart } = useCart();
-  const { activeNeighborhoods, loading: neighbLoading } = useNeighborhoodsDB();
+  const { activeNeighborhoods } = useNeighborhoodsDB();
   const { currentCustomer, lookupByPhone, createOrUpdate, addAddress, deleteAddress } = useCustomers();
   const { createOrder } = useOrdersDB();
   const { settings } = useCompanySettings();
   const navigate = useNavigate();
 
-  // Step management
   const [step, setStep] = useState<"phone" | "details" | "payment">("phone");
   const [submitting, setSubmitting] = useState(false);
   const [whatsappMessage, setWhatsappMessage] = useState<string | null>(null);
   const [whatsappUrl, setWhatsappUrl] = useState<string>("");
 
-  // Phone step
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [phoneLocked, setPhoneLocked] = useState(false);
 
-  // Address
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
   const [showNewAddress, setShowNewAddress] = useState(false);
   const [newAddress, setNewAddress] = useState({ label: "", street: "", number: "", neighborhood: "", reference: "" });
-
-  // Delete address confirmation
   const [deleteAddrId, setDeleteAddrId] = useState<string | null>(null);
 
-  // Delivery mode
   const [deliveryMode, setDeliveryMode] = useState<DeliveryMode>("manual");
-
-  // Manual mode
   const [selectedNeighborhoodId, setSelectedNeighborhoodId] = useState<string>("");
 
-  // Payment
   const [payment, setPayment] = useState<PaymentMethod>("pix");
   const [changeFor, setChangeFor] = useState("");
 
-  // Derived
   const selectedAddress = useMemo(() => {
-    if (selectedAddressId && currentCustomer) {
-      return currentCustomer.addresses.find((a) => a.id === selectedAddressId);
-    }
+    if (selectedAddressId && currentCustomer) return currentCustomer.addresses.find((a) => a.id === selectedAddressId);
     return null;
   }, [selectedAddressId, currentCustomer]);
 
@@ -94,12 +82,8 @@ const Checkout = () => {
     return activeNeighborhoods.find((n) => n.id === selectedNeighborhoodId) || null;
   }, [selectedNeighborhoodId, activeNeighborhoods]);
 
-  // Unified fee
   const deliveryFee = deliveryMode === "retirada" ? 0 : selectedNeighborhood ? Number(selectedNeighborhood.fee) : 0;
-
   const hasValidDelivery = deliveryMode === "retirada" || !!selectedNeighborhood;
-
-  // Card fee (6%)
   const cardFee = payment === "cartao" ? (total + deliveryFee) * 0.06 : 0;
   const grandTotal = total + deliveryFee + cardFee;
 
@@ -107,27 +91,18 @@ const Checkout = () => {
     setDeliveryMode("retirada");
     setSelectedNeighborhoodId("");
   };
+  const switchToManual = () => setDeliveryMode("manual");
 
-  const switchToManual = () => {
-    setDeliveryMode("manual");
-  };
-
-  // Auto-select neighborhood when choosing saved address
   const handleSelectAddress = (addr: CustomerAddress) => {
     setSelectedAddressId(addr.id);
     setShowNewAddress(false);
     setDeliveryMode("manual");
-
-    // Try to match neighborhood
     const match = activeNeighborhoods.find(
       (n) => n.name.toLowerCase().trim() === addr.neighborhood.toLowerCase().trim(),
     );
-    if (match) {
-      setSelectedNeighborhoodId(match.id);
-    }
+    if (match) setSelectedNeighborhoodId(match.id);
   };
 
-  // Delete address
   const handleConfirmDeleteAddress = async () => {
     if (!deleteAddrId) return;
     const digits = phone.replace(/\D/g, "");
@@ -138,13 +113,10 @@ const Checkout = () => {
         setSelectedNeighborhoodId("");
       }
       toast.success("Endereço removido!");
-    } else {
-      toast.error("Erro ao remover endereço.");
-    }
+    } else toast.error("Erro ao remover endereço.");
     setDeleteAddrId(null);
   };
 
-  // Phone lookup
   const handlePhoneLookup = async () => {
     const digits = phone.replace(/\D/g, "");
     if (digits.length < 10 || digits.length > 11) {
@@ -155,9 +127,7 @@ const Checkout = () => {
     if (found) {
       setName(found.name);
       toast.success(`Bem-vindo de volta, ${found.name}! 🎉`);
-      if (found.addresses.length > 0) {
-        handleSelectAddress(found.addresses[0]);
-      }
+      if (found.addresses.length > 0) handleSelectAddress(found.addresses[0]);
     }
     setPhoneLocked(true);
     setStep("details");
@@ -165,7 +135,6 @@ const Checkout = () => {
 
   const handleAddNewAddress = async () => {
     const addrNeighborhood = selectedNeighborhood ? selectedNeighborhood.name : newAddress.neighborhood;
-
     if (!newAddress.street || !newAddress.number || !addrNeighborhood) {
       toast.error("Preencha rua, número e bairro!");
       return;
@@ -174,10 +143,8 @@ const Checkout = () => {
       toast.error("Informe seu nome!");
       return;
     }
-
     const digits = phone.replace(/\D/g, "");
     await createOrUpdate(digits, name);
-
     const success = await addAddress(digits, {
       label: newAddress.label || addrNeighborhood,
       street: newAddress.street,
@@ -185,12 +152,9 @@ const Checkout = () => {
       neighborhood: addrNeighborhood,
       reference: newAddress.reference,
     });
-
     if (success) {
       const updated = await lookupByPhone(digits);
-      if (updated && updated.addresses.length > 0) {
-        handleSelectAddress(updated.addresses[0]);
-      }
+      if (updated && updated.addresses.length > 0) handleSelectAddress(updated.addresses[0]);
     }
     setShowNewAddress(false);
     setNewAddress({ label: "", street: "", number: "", neighborhood: "", reference: "" });
@@ -202,22 +166,15 @@ const Checkout = () => {
       toast.error("Informe seu nome!");
       return;
     }
-
     const isPickup = deliveryMode === "retirada";
-
     let finalAddress: { street: string; number: string; neighborhood: string; reference?: string } | null = null;
 
     if (isPickup) {
-      finalAddress = {
-        street: "Retirada no local",
-        number: "-",
-        neighborhood: "Retirada",
-      };
+      finalAddress = { street: "Retirada no local", number: "-", neighborhood: "Retirada" };
     } else {
       const addrNeighborhood = selectedNeighborhood
         ? selectedNeighborhood.name
         : selectedAddress?.neighborhood || newAddress.neighborhood;
-
       finalAddress = selectedAddress
         ? {
             street: selectedAddress.street,
@@ -233,7 +190,6 @@ const Checkout = () => {
               reference: newAddress.reference,
             }
           : null;
-
       if (!finalAddress || !finalAddress.street || !finalAddress.neighborhood) {
         toast.error("Selecione ou adicione um endereço!");
         return;
@@ -250,7 +206,6 @@ const Checkout = () => {
     }
 
     setSubmitting(true);
-
     const digits = phone.replace(/\D/g, "");
     createOrUpdate(digits, name);
 
@@ -263,6 +218,7 @@ const Checkout = () => {
       notes: i.notes,
     }));
 
+    // cardFee salvo separado no banco
     const order = await createOrder(
       name,
       digits,
@@ -275,6 +231,7 @@ const Checkout = () => {
       orderItems,
       total,
       deliveryFee,
+      cardFee,
       grandTotal,
       payment,
     );
@@ -285,7 +242,6 @@ const Checkout = () => {
       return;
     }
 
-    // Build WhatsApp message
     const itemsText = items
       .map(
         (i) =>
@@ -300,39 +256,19 @@ const Checkout = () => {
           ? `Cartão (+6% taxa: R$ ${cardFee.toFixed(2)})`
           : `Dinheiro${changeFor ? ` — Troco para R$ ${changeFor}` : ""}`;
 
-    const deliveryInfo = isPickup
-      ? "🏪 *Retirada no local* — Sem taxa de entrega"
-      : `📍 Bairro: ${finalAddress!.neighborhood}`;
-
     const addressBlock = isPickup
       ? `*Modalidade:* Retirada no local`
       : `*Endereço:*\n${finalAddress!.street}, ${finalAddress!.number}\nBairro: ${finalAddress!.neighborhood}${finalAddress!.reference ? `\nRef: ${finalAddress!.reference}` : ""}`;
 
+    const deliveryInfo = isPickup
+      ? "🏪 *Retirada no local* — Sem taxa de entrega"
+      : `📍 Bairro: ${finalAddress!.neighborhood}`;
     const feeLabel = isPickup ? "Retirada: Grátis" : `Taxa entrega: R$ ${deliveryFee.toFixed(2)}`;
     const cardFeeLabel = payment === "cartao" ? `\nTaxa cartão (6%): R$ ${cardFee.toFixed(2)}` : "";
 
-    const message = `*Pedido ${settings.name}* 🍣
-*Nº ${order.order_number}*
-
-*Nome:* ${name}
-*Telefone:* ${formatPhone(digits)}
-
-${addressBlock}
-
-${deliveryInfo}
-
-*Pedido:*
-${itemsText}
-
-Subtotal: R$ ${total.toFixed(2)}
-${feeLabel}${cardFeeLabel}
-
-*Total: R$ ${grandTotal.toFixed(2)}*
-
-*Pagamento:* ${paymentLabel}`;
+    const message = `*Pedido ${settings.name}* 🍣\n*Nº ${order.order_number}*\n\n*Nome:* ${name}\n*Telefone:* ${formatPhone(digits)}\n\n${addressBlock}\n\n${deliveryInfo}\n\n*Pedido:*\n${itemsText}\n\nSubtotal: R$ ${total.toFixed(2)}\n${feeLabel}${cardFeeLabel}\n\n*Total: R$ ${grandTotal.toFixed(2)}*\n\n*Pagamento:* ${paymentLabel}`;
 
     const encoded = encodeURIComponent(message);
-    // FIX: usando || "" para evitar erro se settings.phone for undefined/null
     const whatsappPhone = (settings.phone || "").replace(/\D/g, "");
     setWhatsappUrl(`https://wa.me/${whatsappPhone}?text=${encoded}`);
     setWhatsappMessage(message);
@@ -353,14 +289,11 @@ ${feeLabel}${cardFeeLabel}
     <div className="min-h-screen bg-background pb-10">
       <Header />
       <div className="container py-4 space-y-6">
-        {/* Delete address confirmation dialog */}
         <AlertDialog open={!!deleteAddrId} onOpenChange={(open) => !open && setDeleteAddrId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Remover endereço?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Essa ação não pode ser desfeita. O endereço será removido permanentemente.
-              </AlertDialogDescription>
+              <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -374,7 +307,6 @@ ${feeLabel}${cardFeeLabel}
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* WHATSAPP MESSAGE PREVIEW */}
         {whatsappMessage ? (
           <div className="space-y-4 animate-fade-in">
             <div className="flex items-center gap-2">
@@ -386,7 +318,6 @@ ${feeLabel}${cardFeeLabel}
               </button>
               <h1 className="font-display text-xl font-bold text-foreground">Pedido Pronto!</h1>
             </div>
-
             <div className="bg-card border border-border rounded-xl p-4 space-y-3">
               <p className="text-sm font-bold text-foreground flex items-center gap-2">
                 <MessageCircle className="h-4 w-4 text-primary" /> Mensagem do Pedido
@@ -404,14 +335,11 @@ ${feeLabel}${cardFeeLabel}
                 <Copy className="h-4 w-4" /> Copiar mensagem
               </button>
             </div>
-
-            <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 space-y-2">
+            <div className="bg-primary/10 border border-primary/30 rounded-xl p-4">
               <p className="text-sm text-primary font-medium">
-                📱 Clique no botão abaixo para abrir o WhatsApp com a mensagem já preenchida. Basta apertar{" "}
-                <strong>Enviar</strong>!
+                📱 Clique abaixo para abrir o WhatsApp com a mensagem já preenchida.
               </p>
             </div>
-
             <button
               onClick={handleOpenWhatsApp}
               className="w-full gradient-red text-primary-foreground py-4 rounded-full font-bold text-base flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
@@ -423,7 +351,7 @@ ${feeLabel}${cardFeeLabel}
           <>
             <h1 className="font-display text-xl font-bold text-foreground">Finalizar Pedido</h1>
 
-            {/* STEP 1: Phone */}
+            {/* Telefone */}
             <div className="space-y-3">
               <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <Phone className="h-4 w-4 text-primary" /> Identificação
@@ -461,9 +389,9 @@ ${feeLabel}${cardFeeLabel}
               )}
             </div>
 
-            {/* STEP 2: Name + Neighborhood + Address */}
             {step !== "phone" && (
               <>
+                {/* Nome */}
                 <div className="space-y-3 animate-fade-in">
                   <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                     <User className="h-4 w-4 text-primary" /> Seu Nome
@@ -476,37 +404,26 @@ ${feeLabel}${cardFeeLabel}
                   />
                 </div>
 
-                {/* Delivery Mode: Manual (Neighborhood) or Retirada */}
+                {/* Frete */}
                 <div className="space-y-3 animate-fade-in">
                   <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                     <Navigation className="h-4 w-4 text-primary" /> Cálculo do Frete
                   </h2>
-
-                  {/* Mode toggle */}
                   <div className="flex gap-2">
                     <button
                       onClick={switchToManual}
-                      className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
-                        deliveryMode === "manual"
-                          ? "gradient-red text-primary-foreground border-primary"
-                          : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
-                      }`}
+                      className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${deliveryMode === "manual" ? "gradient-red text-primary-foreground border-primary" : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"}`}
                     >
                       🏘️ Bairro
                     </button>
                     <button
                       onClick={switchToRetirada}
-                      className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
-                        deliveryMode === "retirada"
-                          ? "gradient-red text-primary-foreground border-primary"
-                          : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
-                      }`}
+                      className={`flex-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${deliveryMode === "retirada" ? "gradient-red text-primary-foreground border-primary" : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"}`}
                     >
                       🏪 Retirada
                     </button>
                   </div>
 
-                  {/* MANUAL MODE */}
                   {deliveryMode === "manual" && (
                     <div className="space-y-3">
                       <Select value={selectedNeighborhoodId} onValueChange={setSelectedNeighborhoodId}>
@@ -521,7 +438,6 @@ ${feeLabel}${cardFeeLabel}
                           ))}
                         </SelectContent>
                       </Select>
-
                       {selectedNeighborhood && (
                         <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
                           <p className="text-sm font-bold text-primary">
@@ -535,7 +451,6 @@ ${feeLabel}${cardFeeLabel}
                     </div>
                   )}
 
-                  {/* RETIRADA MODE */}
                   {deliveryMode === "retirada" && (
                     <div className="bg-primary/10 border border-primary/30 rounded-xl p-4 space-y-2">
                       <p className="text-base font-bold text-primary flex items-center gap-2">
@@ -551,35 +466,23 @@ ${feeLabel}${cardFeeLabel}
                             {[settings.city, settings.state].filter(Boolean).join(" — ")}
                           </p>
                         )}
-                        {!settings.address && (
-                          <p className="text-xs text-destructive mt-1">
-                            ⚠️ O restaurante ainda não cadastrou o endereço. Entre em contato para confirmar o local de
-                            retirada.
-                          </p>
-                        )}
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Address — hidden for pickup */}
+                {/* Endereço */}
                 {deliveryMode !== "retirada" && (
                   <div className="space-y-3 animate-fade-in">
                     <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-primary" /> Endereço de Entrega
                     </h2>
-
-                    {/* Saved addresses */}
                     {currentCustomer && currentCustomer.addresses.length > 0 && (
                       <div className="space-y-2">
                         {currentCustomer.addresses.map((addr) => (
                           <div
                             key={addr.id}
-                            className={`relative w-full text-left p-3 rounded-lg border transition-colors cursor-pointer ${
-                              selectedAddressId === addr.id
-                                ? "border-primary bg-primary/10"
-                                : "border-border bg-card hover:border-primary/50"
-                            }`}
+                            className={`relative w-full text-left p-3 rounded-lg border transition-colors cursor-pointer ${selectedAddressId === addr.id ? "border-primary bg-primary/10" : "border-border bg-card hover:border-primary/50"}`}
                             onClick={() => handleSelectAddress(addr)}
                           >
                             <div className="flex items-center justify-between">
@@ -606,8 +509,6 @@ ${feeLabel}${cardFeeLabel}
                         ))}
                       </div>
                     )}
-
-                    {/* Add new address button */}
                     {!showNewAddress && (
                       <button
                         onClick={() => {
@@ -619,8 +520,6 @@ ${feeLabel}${cardFeeLabel}
                         <Plus className="h-4 w-4" /> Adicionar novo endereço
                       </button>
                     )}
-
-                    {/* New address form */}
                     {showNewAddress && (
                       <div className="bg-card border border-border rounded-lg p-4 space-y-3 animate-fade-in">
                         <p className="text-sm font-bold text-foreground">Novo Endereço</p>
@@ -642,8 +541,6 @@ ${feeLabel}${cardFeeLabel}
                           value={newAddress.number}
                           onChange={(e) => setNewAddress((p) => ({ ...p, number: e.target.value }))}
                         />
-
-                        {/* Neighborhood: auto-filled in manual mode */}
                         {selectedNeighborhood ? (
                           <div className="bg-secondary border border-border rounded-lg px-4 py-3 text-sm text-foreground opacity-70">
                             Bairro: {selectedNeighborhood.name}
@@ -656,14 +553,12 @@ ${feeLabel}${cardFeeLabel}
                             onChange={(e) => setNewAddress((p) => ({ ...p, neighborhood: e.target.value }))}
                           />
                         )}
-
                         <input
                           className={inputClass}
                           placeholder="Ponto de referência (opcional)"
                           value={newAddress.reference}
                           onChange={(e) => setNewAddress((p) => ({ ...p, reference: e.target.value }))}
                         />
-
                         <div className="flex gap-2">
                           <button
                             onClick={handleAddNewAddress}
@@ -683,7 +578,7 @@ ${feeLabel}${cardFeeLabel}
                   </div>
                 )}
 
-                {/* Payment */}
+                {/* Pagamento */}
                 <div className="space-y-3 animate-fade-in">
                   <h2 className="text-sm font-bold text-foreground">Forma de Pagamento</h2>
                   <div className="flex gap-2">
@@ -691,11 +586,7 @@ ${feeLabel}${cardFeeLabel}
                       <button
                         key={p}
                         onClick={() => setPayment(p)}
-                        className={`flex-1 py-3 rounded-lg border text-sm font-medium transition-colors ${
-                          payment === p
-                            ? "gradient-red text-primary-foreground border-primary"
-                            : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"
-                        }`}
+                        className={`flex-1 py-3 rounded-lg border text-sm font-medium transition-colors ${payment === p ? "gradient-red text-primary-foreground border-primary" : "bg-secondary text-secondary-foreground border-border hover:border-primary/50"}`}
                       >
                         {p === "pix" ? "PIX" : p === "dinheiro" ? "Dinheiro" : "Cartão"}
                       </button>
@@ -724,16 +615,13 @@ ${feeLabel}${cardFeeLabel}
                       {settings.pix_bank && <p className="text-xs text-muted-foreground">{settings.pix_bank}</p>}
                       {settings.pix_name && <p className="text-xs text-muted-foreground">{settings.pix_name}</p>}
                       {!settings.pix_key && (
-                        <p className="text-xs text-muted-foreground">
-                          Dados PIX não configurados. Entre em contato com o restaurante.
-                        </p>
+                        <p className="text-xs text-muted-foreground">Dados PIX não configurados.</p>
                       )}
                       <p className="text-xs text-primary mt-2">
                         Após realizar o pagamento, envie o comprovante para confirmar seu pedido.
                       </p>
                     </div>
                   )}
-
                   {payment === "dinheiro" && (
                     <input
                       className={inputClass}
@@ -742,7 +630,6 @@ ${feeLabel}${cardFeeLabel}
                       onChange={(e) => setChangeFor(e.target.value)}
                     />
                   )}
-
                   {payment === "cartao" && (
                     <div className="bg-card border border-border rounded-lg p-4 space-y-2">
                       <p className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -758,7 +645,7 @@ ${feeLabel}${cardFeeLabel}
                   )}
                 </div>
 
-                {/* Summary */}
+                {/* Resumo */}
                 <div className="bg-card border border-border rounded-lg p-4 space-y-2 animate-fade-in">
                   <h2 className="text-sm font-bold text-foreground">Resumo do Pedido</h2>
                   {items.map((i) => (
@@ -799,7 +686,6 @@ ${feeLabel}${cardFeeLabel}
                   </div>
                 </div>
 
-                {/* Submit */}
                 <button
                   onClick={handleSubmit}
                   disabled={!hasValidDelivery || submitting}
