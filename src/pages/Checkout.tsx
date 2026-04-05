@@ -276,10 +276,10 @@ const Checkout = () => {
   };
 
   const handleOpenWhatsApp = () => {
-    window.open(whatsappUrl, "_blank");
     clearCart();
-    navigate("/");
     toast.success("Pedido enviado! Verifique o WhatsApp.");
+    // Use location.href for better Android compatibility (window.open is often blocked)
+    window.location.href = whatsappUrl;
   };
 
   const inputClass =
