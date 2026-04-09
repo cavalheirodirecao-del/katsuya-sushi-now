@@ -86,10 +86,14 @@ export type Database = {
       company_settings: {
         Row: {
           address: string | null
+          business_hours: Json
           city: string | null
           created_at: string
           description: string | null
           facebook: string | null
+          high_demand_activated_at: string | null
+          high_demand_active: boolean
+          high_demand_message: string | null
           id: string
           instagram: string | null
           logo_url: string | null
@@ -104,10 +108,14 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          business_hours?: Json
           city?: string | null
           created_at?: string
           description?: string | null
           facebook?: string | null
+          high_demand_activated_at?: string | null
+          high_demand_active?: boolean
+          high_demand_message?: string | null
           id?: string
           instagram?: string | null
           logo_url?: string | null
@@ -122,10 +130,14 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          business_hours?: Json
           city?: string | null
           created_at?: string
           description?: string | null
           facebook?: string | null
+          high_demand_activated_at?: string | null
+          high_demand_active?: boolean
+          high_demand_message?: string | null
           id?: string
           instagram?: string | null
           logo_url?: string | null
