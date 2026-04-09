@@ -49,7 +49,7 @@ const Checkout = () => {
   const { activeNeighborhoods } = useNeighborhoodsDB();
   const { currentCustomer, lookupByPhone, createOrUpdate, addAddress, deleteAddress } = useCustomers();
   const { createOrder } = useOrdersDB();
-  const { settings } = useCompanySettings();
+  const { settings, isOpen: storeIsOpen } = useCompanySettings();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<"phone" | "details" | "payment">("phone");
@@ -162,6 +162,10 @@ const Checkout = () => {
   };
 
   const handleSubmit = async () => {
+    if (!storeIsOpen) {
+      toast.error("Não é possível finalizar o pedido — restaurante fechado ou em alta demanda.");
+      return;
+    }
     if (!name) {
       toast.error("Informe seu nome!");
       return;
