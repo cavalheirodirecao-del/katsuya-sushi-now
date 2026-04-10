@@ -1,6 +1,7 @@
-import { Plus, AlertCircle } from "lucide-react";
+import { Plus, AlertCircle, Clock } from "lucide-react";
 import { Product } from "@/hooks/useProductsDB";
 import { useCart } from "@/contexts/CartContext";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -10,18 +11,26 @@ interface Props {
 
 const ProductCard = ({ product }: Props) => {
   const { addItem } = useCart();
+  const { isOpen } = useCompanySettings();
   const [selectedFlavor, setSelectedFlavor] = useState(product.flavors?.[0] || "");
 
   const isOutOfStock = product.stock === 0;
+  const isDisabled = isOutOfStock || !isOpen;
 
   const handleAdd = () => {
     if (isOutOfStock) {
       toast.error("Produto esgotado!");
       return;
     }
+    if (!isOpen) {
+      toast.error("Fora do horário de funcionamento.");
+      return;
+    }
     addItem(product, selectedFlavor || undefined);
     toast.success(`${product.name} adicionado ao carrinho!`);
   };
+
+  const buttonLabel = isOutOfStock ? "Esgotado" : !isOpen ? "Fora do horário" : "Adicionar";
 
   return (
     <div className="bg-card rounded-lg border border-border overflow-hidden animate-fade-in">
@@ -78,11 +87,11 @@ const ProductCard = ({ product }: Props) => {
 
         <button
           onClick={handleAdd}
-          disabled={isOutOfStock}
+          disabled={isDisabled}
           className="mt-2 gradient-red text-primary-foreground rounded-lg py-2.5 flex items-center justify-center gap-2 font-medium text-sm hover:opacity-90 transition-opacity active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Plus className="h-4 w-4" />
-          {isOutOfStock ? "Esgotado" : "Adicionar"}
+          {!isOpen ? <Clock className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          {buttonLabel}
         </button>
       </div>
     </div>

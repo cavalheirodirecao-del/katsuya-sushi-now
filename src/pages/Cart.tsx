@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Minus, Plus, Trash2, ShoppingBag, MessageSquare } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingBag, MessageSquare, Clock } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+import { useCompanySettings } from "@/hooks/useCompanySettings";
 import Header from "@/components/Header";
 
 const Cart = () => {
   const { items, updateQuantity, updateNotes, removeItem, total } = useCart();
+  const { isOpen } = useCompanySettings();
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
 
   const toggleNotes = (id: string) => {
@@ -96,12 +98,23 @@ const Cart = () => {
           <span className="text-foreground font-bold text-xl">R$ {total.toFixed(2)}</span>
         </div>
         <div className="container">
-          <Link
-            to="/checkout"
-            className="block gradient-red text-primary-foreground py-3.5 rounded-full font-bold text-center text-base hover:opacity-90 transition-opacity"
-          >
-            Finalizar Pedido
-          </Link>
+          {isOpen ? (
+            <Link
+              to="/checkout"
+              className="block gradient-red text-primary-foreground py-3.5 rounded-full font-bold text-center text-base hover:opacity-90 transition-opacity"
+            >
+              Finalizar Pedido
+            </Link>
+          ) : (
+            <div className="text-center space-y-2">
+              <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm">
+                <Clock className="h-4 w-4" /> Fora do horário de funcionamento
+              </div>
+              <div className="block bg-muted text-muted-foreground py-3.5 rounded-full font-bold text-center text-base cursor-not-allowed opacity-60">
+                Finalizar Pedido
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
