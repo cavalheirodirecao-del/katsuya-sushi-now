@@ -23,7 +23,7 @@ import {
   Trash2,
   CreditCard,
 } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -279,11 +279,20 @@ const Checkout = () => {
     setSubmitting(false);
   };
 
+  const [whatsappFallback, setWhatsappFallback] = useState(false);
+
   const handleOpenWhatsApp = () => {
     clearCart();
     toast.success("Pedido enviado! Verifique o WhatsApp.");
-    // Use location.href for better Android compatibility (window.open is often blocked)
-    window.location.href = whatsappUrl;
+    setWhatsappFallback(false);
+    // Delay for Android stability
+    setTimeout(() => {
+      window.location.href = whatsappUrl;
+    }, 100);
+    // Fallback: if still on page after 3s, show retry button
+    setTimeout(() => {
+      setWhatsappFallback(true);
+    }, 3000);
   };
 
   const inputClass =
@@ -350,6 +359,19 @@ const Checkout = () => {
             >
               <ExternalLink className="h-5 w-5" /> Abrir WhatsApp e Enviar
             </button>
+            {whatsappFallback && (
+              <div className="space-y-2 animate-fade-in">
+                <p className="text-sm text-muted-foreground text-center">Não abriu? Tente novamente ou copie a mensagem acima.</p>
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full block bg-secondary text-foreground py-3 rounded-full font-bold text-center text-sm hover:bg-accent transition-colors"
+                >
+                  Tentar novamente
+                </a>
+              </div>
+            )}
           </div>
         ) : (
           <>
@@ -430,18 +452,18 @@ const Checkout = () => {
 
                   {deliveryMode === "manual" && (
                     <div className="space-y-3">
-                      <Select value={selectedNeighborhoodId} onValueChange={setSelectedNeighborhoodId}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecione seu bairro" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {activeNeighborhoods.map((n) => (
-                            <SelectItem key={n.id} value={n.id}>
-                              {n.name} — R$ {Number(n.fee).toFixed(2)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <select
+                        value={selectedNeighborhoodId}
+                        onChange={(e) => setSelectedNeighborhoodId(e.target.value)}
+                        className="w-full bg-secondary border border-border rounded-lg px-4 py-3 text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none"
+                      >
+                        <option value="" disabled>Selecione seu bairro</option>
+                        {activeNeighborhoods.map((n) => (
+                          <option key={n.id} value={n.id}>
+                            {n.name} — R$ {Number(n.fee).toFixed(2)}
+                          </option>
+                        ))}
+                      </select>
                       {selectedNeighborhood && (
                         <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
                           <p className="text-sm font-bold text-primary">
