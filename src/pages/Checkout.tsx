@@ -359,6 +359,19 @@ const Checkout = () => {
             >
               <ExternalLink className="h-5 w-5" /> Abrir WhatsApp e Enviar
             </button>
+            {whatsappFallback && (
+              <div className="space-y-2 animate-fade-in">
+                <p className="text-sm text-muted-foreground text-center">Não abriu? Tente novamente ou copie a mensagem acima.</p>
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full block bg-secondary text-foreground py-3 rounded-full font-bold text-center text-sm hover:bg-accent transition-colors"
+                >
+                  Tentar novamente
+                </a>
+              </div>
+            )}
           </div>
         ) : (
           <>
