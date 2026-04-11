@@ -80,14 +80,32 @@ export const useOrdersDB = () => {
   useEffect(() => {
     fetchOrders();
 
-    const channel = supabase
+    let channel = supabase
       .channel("orders-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
         fetchOrders();
       })
       .subscribe();
 
+    // Re-fetch and reconnect realtime when app returns from background (Android fix)
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchOrders();
+        // Reconnect channel in case WebSocket dropped while backgrounded
+        supabase.removeChannel(channel);
+        channel = supabase
+          .channel("orders-realtime-" + Date.now())
+          .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+            fetchOrders();
+          })
+          .subscribe();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
       supabase.removeChannel(channel);
     };
   }, [fetchOrders]);

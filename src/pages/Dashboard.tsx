@@ -30,6 +30,10 @@ import { format, parseISO } from "date-fns";
 const playNotificationSound = () => {
   try {
     const ctx = new AudioContext();
+    // Resume context if suspended (common on Android after backgrounding)
+    if (ctx.state === "suspended") {
+      ctx.resume();
+    }
     const osc1 = ctx.createOscillator();
     const osc2 = ctx.createOscillator();
     const gain = ctx.createGain();
