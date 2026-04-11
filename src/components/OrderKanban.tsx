@@ -36,7 +36,13 @@ const getWhatsAppMessage = (order: OrderDB, status: OrderStatus): string | null 
 const openWhatsApp = (phone: string, message: string) => {
   const digits = phone.replace(/\D/g, "");
   const encoded = encodeURIComponent(message);
-  window.open(`https://wa.me/55${digits}?text=${encoded}`, "_blank");
+  const url = `https://wa.me/55${digits}?text=${encoded}`;
+  // Use link click instead of window.open to avoid Android blank screen on return
+  const a = document.createElement("a");
+  a.href = url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.click();
 };
 
 const PAYMENT_LABELS: Record<string, string> = { pix: "PIX", dinheiro: "Dinheiro", cartao: "Cartão" };
