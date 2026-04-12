@@ -140,48 +140,37 @@ export const useOrdersDB = () => {
   ): Promise<OrderDB | null> => {
     const orderNumber = `PED-${Date.now().toString(36).toUpperCase()}`;
 
-    const { data: orderData, error: orderError } = await supabase
-      .from("orders")
-      .insert({
-        order_number: orderNumber,
-        customer_name: customerName,
-        customer_phone: customerPhone,
-        address_street: address.street,
-        address_number: address.number,
-        address_neighborhood: address.neighborhood,
-        address_reference: address.reference || null,
-        subtotal,
-        delivery_fee: deliveryFee,
-        card_fee: cardFee,
-        total,
-        payment_method: paymentMethod,
-        status: "pendente" as OrderStatus,
-      })
-      .select()
-      .single();
+    // Uses secure RPC — creates order + items in one call and returns the order.
+    // Anonymous users cannot read orders directly via SELECT.
+    const { data, error } = await (supabase as any).rpc("create_order_public", {
+      p_order_number:   orderNumber,
+      p_customer_name:  customerName,
+      p_customer_phone: customerPhone,
+      p_street:         address.street,
+      p_number:         address.number,
+      p_neighborhood:   address.neighborhood,
+      p_reference:      address.reference || "",
+      p_subtotal:       subtotal,
+      p_delivery_fee:   deliveryFee,
+      p_card_fee:       cardFee,
+      p_total:          total,
+      p_payment_method: paymentMethod,
+      p_items: items.map((i) => ({
+        productId: i.productId || null,
+        name:      i.name,
+        quantity:  i.quantity,
+        price:     i.price,
+        flavor:    i.flavor || null,
+        notes:     i.notes || null,
+      })),
+    });
 
-    if (orderError || !orderData) {
-      console.error("Error creating order:", orderError);
+    if (error || !data) {
+      console.error("Error creating order:", error);
       return null;
     }
 
-    const orderItems = items.map((item) => ({
-      order_id: orderData.id,
-      product_id: item.productId || null,
-      product_name: item.name,
-      quantity: item.quantity,
-      price: item.price,
-      flavor: item.flavor || null,
-      notes: item.notes || null,
-    }));
-
-    const { error: itemsError } = await supabase.from("order_items").insert(orderItems);
-
-    if (itemsError) {
-      console.error("Error creating order items:", itemsError);
-    }
-
-    return orderData as OrderDB;
+    return { ...data, card_fee: Number(data.card_fee ?? 0) } as OrderDB;
   };
 
   const today = new Date();
