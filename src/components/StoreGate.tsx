@@ -19,12 +19,31 @@ const StoreGate = ({ children, overlay }: StoreGateProps) => {
     : "Estamos fora do horário de funcionamento no momento.";
 
   const icon = isHighDemand ? (
-    <AlertTriangle className="h-10 w-10 text-destructive" />
+    <AlertTriangle className="h-5 w-5 text-destructive" />
   ) : (
-    <Clock className="h-10 w-10 text-primary" />
+    <Clock className="h-5 w-5 text-primary" />
   );
 
-  const banner = (
+  // Overlay mode: banner compacto no topo, sem bloquear a tela
+  if (overlay) {
+    return (
+      <>
+        <div className="w-full bg-card border-b border-border px-4 py-3 flex items-center justify-center gap-3">
+          <span className="shrink-0">{icon}</span>
+          <div className="text-center">
+            <p className="text-sm font-bold text-foreground">
+              {isHighDemand ? "Alta Demanda" : "Fechado agora"}
+            </p>
+            <p className="text-xs text-muted-foreground leading-snug">{message}</p>
+          </div>
+        </div>
+        {children}
+      </>
+    );
+  }
+
+  // Modo padrão (sem overlay): tela inteira bloqueante
+  return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/95 backdrop-blur-sm p-6">
       <div className="bg-card border border-border rounded-2xl p-8 max-w-sm w-full text-center space-y-4 shadow-xl">
         {icon}
@@ -35,17 +54,6 @@ const StoreGate = ({ children, overlay }: StoreGateProps) => {
       </div>
     </div>
   );
-
-  if (overlay) {
-    return (
-      <>
-        {children}
-        {banner}
-      </>
-    );
-  }
-
-  return banner;
 };
 
 export default StoreGate;
