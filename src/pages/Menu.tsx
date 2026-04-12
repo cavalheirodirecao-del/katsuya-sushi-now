@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Settings, Loader2, AlertTriangle, Clock } from "lucide-react";
+import { Settings, Loader2 } from "lucide-react";
 import { useCategories } from "@/hooks/useCategories";
 import { useProductsDB } from "@/hooks/useProductsDB";
-import { useCompanySettings } from "@/hooks/useCompanySettings";
 import ProductCard from "@/components/ProductCard";
 import Header from "@/components/Header";
 

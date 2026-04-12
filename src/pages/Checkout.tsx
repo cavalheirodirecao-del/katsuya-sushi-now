@@ -246,13 +246,6 @@ const Checkout = () => {
       return;
     }
 
-    const itemsText = items
-      .map(
-        (i) =>
-          `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}${i.notes ? `\n   _Obs: ${i.notes}_` : ""}`,
-      )
-      .join("\n");
-
     const paymentLabel =
       payment === "pix"
         ? "PIX — Vou enviar o comprovante."
@@ -270,7 +263,18 @@ const Checkout = () => {
     const feeLabel = isPickup ? "Retirada: Grátis" : `Taxa entrega: R$ ${deliveryFee.toFixed(2)}`;
     const cardFeeLabel = payment === "cartao" ? `\nTaxa cartão (6%): R$ ${cardFee.toFixed(2)}` : "";
 
-    const message = `*Pedido ${settings.name}* 🍣\n*Nº ${order.order_number}*\n\n*Nome:* ${name}\n*Telefone:* ${formatPhone(digits)}\n\n${addressBlock}\n\n${deliveryInfo}\n\n*Pedido:*\n${itemsText}\n\nSubtotal: R$ ${total.toFixed(2)}\n${feeLabel}${cardFeeLabel}\n\n*Total: R$ ${grandTotal.toFixed(2)}*\n\n*Pagamento:* ${paymentLabel}`;
+    const buildMessage = (withNotes: boolean) => {
+      const text = items
+        .map((i) =>
+          `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}${withNotes && i.notes ? `\n   _Obs: ${i.notes}_` : ""}`
+        )
+        .join("\n");
+      return `*Pedido ${settings.name}* 🍣\n*Nº ${order.order_number}*\n\n*Nome:* ${name}\n*Telefone:* ${formatPhone(digits)}\n\n${addressBlock}\n\n${deliveryInfo}\n\n*Pedido:*\n${text}\n\nSubtotal: R$ ${total.toFixed(2)}\n${feeLabel}${cardFeeLabel}\n\n*Total: R$ ${grandTotal.toFixed(2)}*\n\n*Pagamento:* ${paymentLabel}`;
+    };
+
+    // Mensagens muito longas travam o WhatsApp no Android — trunca observações se necessário
+    let message = buildMessage(true);
+    if (message.length > 1500) message = buildMessage(false);
 
     const encoded = encodeURIComponent(message);
     const whatsappPhone = (settings.phone || "").replace(/\D/g, "");
