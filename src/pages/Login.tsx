@@ -19,30 +19,33 @@ const Login = () => {
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) {
-      toast.error("Email ou senha inválidos");
-      return;
+      if (error) {
+        toast.error("Email ou senha inválidos");
+        return;
+      }
+
+      // Check if user has admin/operator/support role
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Erro ao verificar usuário");
+        return;
+      }
+
+      const { data: roles } = await supabase.rpc("get_user_roles", { _user_id: user.id });
+      if (!roles || roles.length === 0) {
+        await supabase.auth.signOut();
+        toast.error("Acesso negado. Usuário sem permissão administrativa.");
+        return;
+      }
+
+      toast.success("Login realizado!");
+      navigate("/admin");
+    } finally {
+      setLoading(false);
     }
-
-    // Check if user has admin/operator/support role
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error("Erro ao verificar usuário");
-      return;
-    }
-
-    const { data: roles } = await supabase.rpc("get_user_roles", { _user_id: user.id });
-    if (!roles || roles.length === 0) {
-      await supabase.auth.signOut();
-      toast.error("Acesso negado. Usuário sem permissão administrativa.");
-      return;
-    }
-
-    toast.success("Login realizado!");
-    navigate("/admin");
   };
 
   return (

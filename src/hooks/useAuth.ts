@@ -30,11 +30,11 @@ export const useAuth = () => {
         supabase.rpc("get_user_roles", { _user_id: currentUser.id }).then(({ data }) => {
           setRoles((data as AppRole[]) || []);
           setLoading(false);
-        });
+        }).catch(() => setLoading(false));
       } else {
         setLoading(false);
       }
-    });
+    }).catch(() => setLoading(false));
 
     // Ao retornar para a aba, re-valida sessão para evitar redirect para login
     const handleVisibility = async () => {
