@@ -36,7 +36,28 @@ export const useAuth = () => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    // Ao retornar para a aba, re-valida sessão para evitar redirect para login
+    const handleVisibility = async () => {
+      if (document.visibilityState !== "visible") return;
+      setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        const { data } = await supabase.rpc("get_user_roles", { _user_id: currentUser.id });
+        setRoles((data as AppRole[]) || []);
+      } else {
+        setRoles([]);
+      }
+      setLoading(false);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   const hasRole = (role: AppRole) => roles.includes(role);
