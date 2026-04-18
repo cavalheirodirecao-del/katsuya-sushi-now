@@ -40,16 +40,19 @@ export const useAuth = () => {
     const handleVisibility = async () => {
       if (document.visibilityState !== "visible") return;
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        const { data } = await supabase.rpc("get_user_roles", { _user_id: currentUser.id });
-        setRoles((data as AppRole[]) || []);
-      } else {
-        setRoles([]);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        if (currentUser) {
+          const { data } = await supabase.rpc("get_user_roles", { _user_id: currentUser.id });
+          setRoles((data as AppRole[]) || []);
+        } else {
+          setRoles([]);
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     document.addEventListener("visibilitychange", handleVisibility);

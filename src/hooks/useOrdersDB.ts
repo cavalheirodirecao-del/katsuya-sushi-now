@@ -49,6 +49,7 @@ export const useOrdersDB = () => {
 
     if (ordersError) {
       console.error("Error fetching orders:", ordersError);
+      setLoading(false);
       return;
     }
 
