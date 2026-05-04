@@ -23,18 +23,21 @@ export const useAuth = () => {
       setLoading(false);
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        supabase.rpc("get_user_roles", { _user_id: currentUser.id }).then(({ data }) => {
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        if (currentUser) {
+          const { data } = await supabase.rpc("get_user_roles", { _user_id: currentUser.id });
           setRoles((data as AppRole[]) || []);
-          setLoading(false);
-        }).catch(() => setLoading(false));
-      } else {
+        }
+      } catch {
+        /* ignore */
+      } finally {
         setLoading(false);
       }
-    }).catch(() => setLoading(false));
+    })();
 
     // Ao retornar para a aba, re-valida sessão para evitar redirect para login
     const handleVisibility = async () => {
