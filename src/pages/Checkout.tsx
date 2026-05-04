@@ -327,18 +327,29 @@ const Checkout = () => {
           <div className="space-y-4 animate-fade-in">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setWhatsappMessage(null)}
+                onClick={() => navigate("/")}
                 className="p-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-accent transition-colors"
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <h1 className="font-display text-xl font-bold text-foreground">Pedido Pronto!</h1>
+              <h1 className="font-display text-xl font-bold text-foreground">Pedido recebido! ✅</h1>
             </div>
+
+            {/* Confirmação clara */}
+            <div className="bg-green-500/10 border border-green-500/40 rounded-xl p-4 space-y-1">
+              <p className="text-sm font-bold text-foreground">
+                ✅ Seu pedido já foi registrado no sistema do restaurante.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Agora envie a mensagem no WhatsApp para confirmarmos com você.
+              </p>
+            </div>
+
             <div className="bg-card border border-border rounded-xl p-4 space-y-3">
               <p className="text-sm font-bold text-foreground flex items-center gap-2">
                 <MessageCircle className="h-4 w-4 text-primary" /> Mensagem do Pedido
               </p>
-              <div className="bg-secondary rounded-lg p-4 whitespace-pre-wrap text-sm text-foreground leading-relaxed font-mono">
+              <div className="bg-secondary rounded-lg p-4 whitespace-pre-wrap text-sm text-foreground leading-relaxed font-mono max-h-64 overflow-y-auto">
                 {whatsappMessage}
               </div>
               <button
@@ -351,20 +362,29 @@ const Checkout = () => {
                 <Copy className="h-4 w-4" /> Copiar mensagem
               </button>
             </div>
+
             <div className="bg-primary/10 border border-primary/30 rounded-xl p-4">
               <p className="text-sm text-primary font-medium">
-                📱 Clique abaixo para abrir o WhatsApp com a mensagem já preenchida.
+                📱 Toque no botão abaixo para abrir o WhatsApp com a mensagem já preenchida.
               </p>
             </div>
-            <button
-              onClick={handleOpenWhatsApp}
+
+            {/* Link nativo — mais estável no Android que window.location.href */}
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleWhatsAppClick}
               className="w-full gradient-red text-primary-foreground py-4 rounded-full font-bold text-base flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
             >
               <ExternalLink className="h-5 w-5" /> Abrir WhatsApp e Enviar
-            </button>
+            </a>
+
             {whatsappFallback && (
               <div className="space-y-2 animate-fade-in">
-                <p className="text-sm text-muted-foreground text-center">Não abriu? Tente novamente ou copie a mensagem acima.</p>
+                <p className="text-sm text-muted-foreground text-center">
+                  Não abriu? Tente novamente ou copie a mensagem acima e cole no WhatsApp.
+                </p>
                 <a
                   href={whatsappUrl}
                   target="_blank"
@@ -375,6 +395,13 @@ const Checkout = () => {
                 </a>
               </div>
             )}
+
+            <button
+              onClick={() => navigate("/")}
+              className="w-full bg-secondary text-secondary-foreground py-3 rounded-full text-sm hover:bg-accent transition-colors"
+            >
+              Voltar ao início
+            </button>
           </div>
         ) : (
           <>
