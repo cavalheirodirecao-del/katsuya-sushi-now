@@ -489,6 +489,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_order_public: {
+        Args: {
+          p_card_fee: number
+          p_customer_name: string
+          p_customer_phone: string
+          p_delivery_fee: number
+          p_items: Json
+          p_neighborhood: string
+          p_number: string
+          p_order_number: string
+          p_payment_method: string
+          p_reference: string
+          p_street: string
+          p_subtotal: number
+          p_total: number
+        }
+        Returns: Json
+      }
       get_user_roles: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"][]
@@ -499,6 +517,11 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      lookup_customer_by_phone: { Args: { p_phone: string }; Returns: Json }
+      upsert_customer: {
+        Args: { p_name: string; p_phone: string }
+        Returns: Json
       }
     }
     Enums: {

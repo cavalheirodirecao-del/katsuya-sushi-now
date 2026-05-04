@@ -1,41 +1,67 @@
+## Plano: Corrigir tela preta no Android ao enviar pedido pelo WhatsApp
 
+### Problema identificado
 
-## Plano: Catálogo Visível Fora do Horário + Correções Android
+O pedido já está sendo gravado no sistema antes de abrir o WhatsApp. O bug acontece na etapa seguinte: o app redireciona o cliente para `wa.me` usando navegação direta (`window.location.href`). Em alguns Androids, essa troca entre navegador/app e WhatsApp pode deixar a aba do site em tela preta ou travada. Como o cliente não vê uma confirmação clara antes da troca, ele fica em dúvida se o pedido foi concluído.
 
-### 1. Catálogo sempre visível (bloquear apenas finalização)
+Também há um erro de TypeScript já detectado em `src/hooks/useAuth.ts`, causado por uso de `.catch()` em um retorno `PromiseLike`. Vou corrigir junto para garantir que o projeto compile corretamente.
 
-**Problema**: O `StoreGate` com overlay bloqueia a visualização do cardápio inteiro quando a loja está fechada.
+### 1. Mostrar confirmação clara antes de abrir o WhatsApp
 
-**Solução**:
-- Remover o `StoreGate` do `Menu.tsx` — o cardápio fica sempre acessível
-- No `ProductCard.tsx`, verificar `isOpen` via `useCompanySettings`. Se fechado, desabilitar o botão "Adicionar" e mostrar texto como "Fora do horário"
-- Manter o `StoreGate` no `Index.tsx` (banner informativo) e no `Checkout.tsx` (bloquear finalização)
-- No `Cart.tsx`, se a loja estiver fechada, desabilitar o botão de ir para checkout com mensagem
+Em `src/pages/Checkout.tsx`:
 
-### 2. Tela preta no Android — Select de bairro
+- Depois de criar o pedido no banco, exibir uma tela de sucesso com:
+  - número do pedido;
+  - mensagem clara: “Seu pedido já foi recebido pelo restaurante”; 
+  - aviso: “Agora envie a mensagem no WhatsApp para confirmar/complementar o atendimento”.
+- O botão deixará de passar a impressão de que o pedido só existe depois do WhatsApp.
+- O carrinho só será limpo depois que o pedido estiver criado com sucesso e a tela de confirmação estiver pronta.
 
-**Problema**: O componente Radix Select usa um Portal com overlay que em dispositivos Android pode causar tela preta ou travamento.
+### 2. Trocar o método de abertura do WhatsApp para um fluxo mais seguro no Android
 
-**Solução**:
-- Substituir o `<Select>` do bairro no Checkout por um `<select>` nativo HTML — funciona perfeitamente em todos os dispositivos mobile
-- Estilizar com as mesmas classes Tailwind para manter a aparência consistente
+Ainda em `src/pages/Checkout.tsx`:
 
-### 3. Tela preta no Android — Finalização / WhatsApp
+- Substituir o redirecionamento direto via `window.location.href` por abertura via link/âncora acionado por clique do usuário, usando `target="_blank"` e `rel="noopener noreferrer"`.
+- Manter fallback visível para o cliente:
+  - botão “Abrir WhatsApp novamente”;
+  - botão “Copiar mensagem”.
+- Evitar que a tela fique “presa” em estado intermediário: após clicar para abrir WhatsApp, o site continuará numa tela de confirmação do pedido, não em uma tela preta/navegação vazia.
 
-**Problema**: Mesmo com `window.location.href`, alguns Android podem ter problemas com URLs longas do WhatsApp ou com o fluxo de navegação.
+### 3. Reduzir risco de travamento por mensagem muito longa
 
-**Solução**:
-- Adicionar `setTimeout` de 100ms antes do `window.location.href` para dar tempo ao browser processar o `clearCart`
-- Limitar o tamanho da mensagem WhatsApp caso seja muito longa (truncar observações se necessário)
-- Adicionar fallback: se após 3 segundos o usuário ainda estiver na página, mostrar botão "Tentar novamente" ou link direto
+Em `src/pages/Checkout.tsx`:
+
+- Manter a remoção de observações em mensagens longas.
+- Adicionar um limite mais seguro para Android: se a mensagem ainda estiver grande, encurtar o texto do pedido para uma versão resumida com número do pedido, dados do cliente, total e instrução para consultar o pedido no painel.
+- Isso evita URLs excessivamente longas no WhatsApp, que são uma causa comum de falhas em Android.
+
+### 4. Revalidar o app ao voltar do WhatsApp
+
+Criar/ajustar uma pequena rotina global de retorno ao app:
+
+- Ao voltar para a aba/app (`visibilitychange`, `pageshow`), forçar o app a sair de estados visuais travados.
+- No checkout, se o cliente voltar do WhatsApp, manter a tela de “Pedido recebido” com botões de tentar novamente/copiar mensagem.
+- Isso ajuda tanto clientes quanto gestor quando alternam entre o site e o WhatsApp.
+
+### 5. Corrigir erro de build em `useAuth`
+
+Em `src/hooks/useAuth.ts`:
+
+- Remover o uso de `.catch()` encadeado em `PromiseLike`.
+- Reescrever a leitura inicial da sessão com `async/await` dentro do `useEffect`, mantendo o mesmo comportamento.
+- Isso resolve o erro: `Property 'catch' does not exist on type 'PromiseLike<void>'`.
 
 ### Arquivos afetados
 
-| Arquivo | Ação |
+| Arquivo | Alteração |
 |---|---|
-| `src/pages/Menu.tsx` | Remover StoreGate |
-| `src/components/ProductCard.tsx` | Verificar `isOpen`, desabilitar botão se fechado |
-| `src/pages/Cart.tsx` | Bloquear checkout se fechado |
-| `src/pages/Checkout.tsx` | Trocar Select Radix por select nativo; melhorar fluxo WhatsApp |
-| `src/components/StoreGate.tsx` | Sem alteração (continua no Index) |
+| `src/pages/Checkout.tsx` | Confirmação pós-pedido, abertura segura do WhatsApp, fallback e mensagem encurtada |
+| `src/hooks/useAuth.ts` | Correção do erro de TypeScript no carregamento da sessão |
+| Possível novo helper/componente simples | Rotina de retorno do app ao primeiro plano, se ficar mais limpo separar |
 
+### Resultado esperado
+
+- O cliente verá claramente que o pedido já foi recebido no site antes de ir ao WhatsApp.
+- Se o WhatsApp ou Android falhar, o cliente continuará com uma tela útil, com número do pedido e opção de tentar novamente/copiar mensagem.
+- O risco de tela preta no Android será reduzido por evitar navegação direta e URLs longas.
+- O app ficará mais estável ao retornar do WhatsApp.
