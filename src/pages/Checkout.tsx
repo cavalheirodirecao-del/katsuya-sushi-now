@@ -263,7 +263,11 @@ const Checkout = () => {
     const feeLabel = isPickup ? "Retirada: Grátis" : `Taxa entrega: R$ ${deliveryFee.toFixed(2)}`;
     const cardFeeLabel = payment === "cartao" ? `\nTaxa cartão (6%): R$ ${cardFee.toFixed(2)}` : "";
 
-    const buildMessage = (withNotes: boolean) => {
+    const buildMessage = (mode: "full" | "noNotes" | "short") => {
+      if (mode === "short") {
+        return `*Pedido ${settings.name}* 🍣\n*Nº ${order.order_number}*\n\n*Cliente:* ${name}\n*Telefone:* ${formatPhone(digits)}\n\n${addressBlock}\n\n*Total:* R$ ${grandTotal.toFixed(2)}\n*Pagamento:* ${paymentLabel}\n\n_Detalhes completos do pedido já foram registrados no sistema._`;
+      }
+      const withNotes = mode === "full";
       const text = items
         .map((i) =>
           `${i.quantity}x ${i.product.name}${i.flavor ? ` (${i.flavor})` : ""}${withNotes && i.notes ? `\n   _Obs: ${i.notes}_` : ""}`
@@ -272,31 +276,26 @@ const Checkout = () => {
       return `*Pedido ${settings.name}* 🍣\n*Nº ${order.order_number}*\n\n*Nome:* ${name}\n*Telefone:* ${formatPhone(digits)}\n\n${addressBlock}\n\n${deliveryInfo}\n\n*Pedido:*\n${text}\n\nSubtotal: R$ ${total.toFixed(2)}\n${feeLabel}${cardFeeLabel}\n\n*Total: R$ ${grandTotal.toFixed(2)}*\n\n*Pagamento:* ${paymentLabel}`;
     };
 
-    // Mensagens muito longas travam o WhatsApp no Android — trunca observações se necessário
-    let message = buildMessage(true);
-    if (message.length > 1500) message = buildMessage(false);
+    // Mensagens muito longas travam o WhatsApp no Android — encurta progressivamente
+    let message = buildMessage("full");
+    if (message.length > 1200) message = buildMessage("noNotes");
+    if (message.length > 1500) message = buildMessage("short");
 
     const encoded = encodeURIComponent(message);
     const whatsappPhone = (settings.phone || "").replace(/\D/g, "");
     setWhatsappUrl(`https://wa.me/${whatsappPhone}?text=${encoded}`);
     setWhatsappMessage(message);
+    // Limpa carrinho assim que o pedido foi criado com sucesso
+    clearCart();
     setSubmitting(false);
   };
 
   const [whatsappFallback, setWhatsappFallback] = useState(false);
 
-  const handleOpenWhatsApp = () => {
-    clearCart();
-    toast.success("Pedido enviado! Verifique o WhatsApp.");
-    setWhatsappFallback(false);
-    // Delay for Android stability
-    setTimeout(() => {
-      window.location.href = whatsappUrl;
-    }, 100);
-    // Fallback: if still on page after 3s, show retry button
-    setTimeout(() => {
-      setWhatsappFallback(true);
-    }, 3000);
+  const handleWhatsAppClick = () => {
+    toast.success("Abrindo WhatsApp...");
+    // mostra fallback após 3s caso o app não abra
+    setTimeout(() => setWhatsappFallback(true), 3000);
   };
 
   const inputClass =
