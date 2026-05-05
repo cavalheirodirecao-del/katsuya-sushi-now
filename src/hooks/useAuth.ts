@@ -79,6 +79,7 @@ export const useAuth = () => {
   const canViewDashboard = isStaff;
   const canManageOrders = isStaff;
   const canUpdateOrderStatus = isStaff;
+  const canCreateManualOrder = isMaster || hasRole("admin") || hasRole("operator");
 
   const signOut = async () => {
     await supabase.auth.signOut();
