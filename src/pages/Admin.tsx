@@ -7,15 +7,16 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { MapPin, Plus, BarChart3, Loader2, LogOut, Users, MapPinned, Clock, Package, Building2, Tag } from "lucide-react";
+import { MapPin, Plus, BarChart3, Loader2, LogOut, Users, MapPinned, Clock, Package, Building2, Tag, ClipboardEdit } from "lucide-react";
 import UserManagement from "@/components/UserManagement";
 import NeighborhoodManager from "@/components/NeighborhoodManager";
 import AuditLogViewer from "@/components/AuditLogViewer";
 import ProductManager from "@/components/ProductManager";
 import CategoryManager from "@/components/CategoryManager";
 import CompanySettings from "@/components/CompanySettings";
+import ManualOrderForm from "@/components/ManualOrderForm";
 
-type AdminTab = "products" | "categories" | "zones" | "neighborhoods" | "users" | "audit" | "empresa";
+type AdminTab = "manual_order" | "products" | "categories" | "zones" | "neighborhoods" | "users" | "audit" | "empresa";
 
 const Admin = () => {
   const { products, updateProduct, loading, refresh } = useProductsDB();
@@ -23,11 +24,11 @@ const Admin = () => {
   const { categories, loading: catLoading, addCategory, updateCategory } = useCategories();
   const {
     user, isStaff, isMaster, loading: authLoading, signOut,
-    canManageProducts, canManageZones, canManageNeighborhoods, canManageUsers,
+    canManageProducts, canManageZones, canManageNeighborhoods, canManageUsers, canCreateManualOrder,
   } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState("");
-  const [tab, setTab] = useState<AdminTab>("products");
+  const [tab, setTab] = useState<AdminTab>(canCreateManualOrder ? "manual_order" : "products");
 
   // New zone form
   const [newZoneName, setNewZoneName] = useState("");
@@ -51,6 +52,7 @@ const Admin = () => {
     "w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50";
 
   const tabs: { id: AdminTab; label: string; icon: React.ReactNode; visible: boolean }[] = [
+    { id: "manual_order", label: "Lançar Pedido", icon: <ClipboardEdit className="h-4 w-4" />, visible: canCreateManualOrder },
     { id: "products", label: "Produtos", icon: <Package className="h-4 w-4" />, visible: canManageProducts },
     { id: "categories", label: "Categorias", icon: <Tag className="h-4 w-4" />, visible: canManageProducts },
     { id: "zones", label: "Zonas", icon: <MapPin className="h-4 w-4" />, visible: canManageZones },
@@ -96,6 +98,9 @@ const Admin = () => {
         >
           <BarChart3 className="h-4 w-4" /> Abrir Dashboard de Vendas
         </Link>
+
+        {/* MANUAL ORDER TAB */}
+        {tab === "manual_order" && canCreateManualOrder && <ManualOrderForm />}
 
         {/* PRODUCTS TAB */}
         {tab === "products" && canManageProducts && (

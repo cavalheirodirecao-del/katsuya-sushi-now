@@ -519,6 +519,14 @@ export type Database = {
         Returns: boolean
       }
       lookup_customer_by_phone: { Args: { p_phone: string }; Returns: Json }
+      search_customers: {
+        Args: { p_query: string }
+        Returns: {
+          id: string
+          name: string
+          phone: string
+        }[]
+      }
       upsert_customer: {
         Args: { p_name: string; p_phone: string }
         Returns: Json
