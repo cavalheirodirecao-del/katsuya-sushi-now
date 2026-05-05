@@ -99,6 +99,9 @@ const Admin = () => {
           <BarChart3 className="h-4 w-4" /> Abrir Dashboard de Vendas
         </Link>
 
+        {/* MANUAL ORDER TAB */}
+        {tab === "manual_order" && canCreateManualOrder && <ManualOrderForm />}
+
         {/* PRODUCTS TAB */}
         {tab === "products" && canManageProducts && (
           <ProductManager products={products} loading={loading} updateProduct={updateProduct} refresh={refresh} categories={categories} />
