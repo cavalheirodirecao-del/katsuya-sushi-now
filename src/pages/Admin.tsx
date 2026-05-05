@@ -24,11 +24,11 @@ const Admin = () => {
   const { categories, loading: catLoading, addCategory, updateCategory } = useCategories();
   const {
     user, isStaff, isMaster, loading: authLoading, signOut,
-    canManageProducts, canManageZones, canManageNeighborhoods, canManageUsers,
+    canManageProducts, canManageZones, canManageNeighborhoods, canManageUsers, canCreateManualOrder,
   } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState("");
-  const [tab, setTab] = useState<AdminTab>("products");
+  const [tab, setTab] = useState<AdminTab>(canCreateManualOrder ? "manual_order" : "products");
 
   // New zone form
   const [newZoneName, setNewZoneName] = useState("");
