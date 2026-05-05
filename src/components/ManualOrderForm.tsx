@@ -78,7 +78,7 @@ const ManualOrderForm = () => {
 
   const selectedNeighborhood = useMemo(
     () => activeNeighborhoods.find((n) => n.id === selectedNeighborhoodId),
-    [activeNeighborhoodId(selectedNeighborhoodId, activeNeighborhoods)],
+    [selectedNeighborhoodId, activeNeighborhoods],
   );
 
   const products = useMemo(() => getActiveProducts(), [getActiveProducts]);
