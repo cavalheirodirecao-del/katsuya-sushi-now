@@ -7,13 +7,14 @@ import { useAuth } from "@/hooks/useAuth";
 import Header from "@/components/Header";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { MapPin, Plus, BarChart3, Loader2, LogOut, Users, MapPinned, Clock, Package, Building2, Tag } from "lucide-react";
+import { MapPin, Plus, BarChart3, Loader2, LogOut, Users, MapPinned, Clock, Package, Building2, Tag, ClipboardEdit } from "lucide-react";
 import UserManagement from "@/components/UserManagement";
 import NeighborhoodManager from "@/components/NeighborhoodManager";
 import AuditLogViewer from "@/components/AuditLogViewer";
 import ProductManager from "@/components/ProductManager";
 import CategoryManager from "@/components/CategoryManager";
 import CompanySettings from "@/components/CompanySettings";
+import ManualOrderForm from "@/components/ManualOrderForm";
 
 type AdminTab = "products" | "categories" | "zones" | "neighborhoods" | "users" | "audit" | "empresa";
 
