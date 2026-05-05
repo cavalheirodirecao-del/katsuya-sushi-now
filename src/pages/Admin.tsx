@@ -52,6 +52,7 @@ const Admin = () => {
     "w-full bg-secondary border border-border rounded-lg px-3 py-2 text-foreground text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50";
 
   const tabs: { id: AdminTab; label: string; icon: React.ReactNode; visible: boolean }[] = [
+    { id: "manual_order", label: "Lançar Pedido", icon: <ClipboardEdit className="h-4 w-4" />, visible: canCreateManualOrder },
     { id: "products", label: "Produtos", icon: <Package className="h-4 w-4" />, visible: canManageProducts },
     { id: "categories", label: "Categorias", icon: <Tag className="h-4 w-4" />, visible: canManageProducts },
     { id: "zones", label: "Zonas", icon: <MapPin className="h-4 w-4" />, visible: canManageZones },
