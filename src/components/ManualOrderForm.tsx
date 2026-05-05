@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useCustomers, CustomerAddress } from "@/hooks/useCustomers";
+import { useCustomers } from "@/hooks/useCustomers";
 import { useNeighborhoodsDB } from "@/hooks/useNeighborhoodsDB";
 import { useProductsDB, Product } from "@/hooks/useProductsDB";
 import { useOrdersDB, PaymentMethod } from "@/hooks/useOrdersDB";
