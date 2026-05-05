@@ -588,9 +588,4 @@ const ManualOrderForm = () => {
   );
 };
 
-// Helper to avoid stale memo deps
-function activeNeighborhoodId(id: string, list: { id: string }[]) {
-  return list.find((n) => n.id === id)?.id || id;
-}
-
 export default ManualOrderForm;
