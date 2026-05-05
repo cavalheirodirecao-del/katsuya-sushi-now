@@ -16,7 +16,7 @@ import CategoryManager from "@/components/CategoryManager";
 import CompanySettings from "@/components/CompanySettings";
 import ManualOrderForm from "@/components/ManualOrderForm";
 
-type AdminTab = "products" | "categories" | "zones" | "neighborhoods" | "users" | "audit" | "empresa";
+type AdminTab = "manual_order" | "products" | "categories" | "zones" | "neighborhoods" | "users" | "audit" | "empresa";
 
 const Admin = () => {
   const { products, updateProduct, loading, refresh } = useProductsDB();
