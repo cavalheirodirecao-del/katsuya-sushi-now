@@ -100,6 +100,7 @@ export const useAuth = () => {
     canViewDashboard,
     canManageOrders,
     canUpdateOrderStatus,
+    canCreateManualOrder,
     signOut,
   };
 };
