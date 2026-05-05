@@ -128,5 +128,18 @@ export const useCustomers = () => {
     return true;
   }, [lookupByPhone]);
 
-  return { currentCustomer, setCurrentCustomer, lookupByPhone, createOrUpdate, addAddress, deleteAddress };
+  const searchCustomers = useCallback(
+    async (query: string): Promise<{ id: string; name: string; phone: string }[]> => {
+      if (!query || query.trim().length < 2) return [];
+      const { data, error } = await (supabase as any).rpc("search_customers", { p_query: query });
+      if (error) {
+        console.error("Error searching customers:", error);
+        return [];
+      }
+      return (data || []) as { id: string; name: string; phone: string }[];
+    },
+    [],
+  );
+
+  return { currentCustomer, setCurrentCustomer, lookupByPhone, createOrUpdate, addAddress, deleteAddress, searchCustomers };
 };
