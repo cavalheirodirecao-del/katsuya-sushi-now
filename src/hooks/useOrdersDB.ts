@@ -56,12 +56,28 @@ export const useOrdersDB = () => {
     const orderIds = ordersData?.map((o) => o.id) || [];
 
     if (orderIds.length > 0) {
-      const { data: itemsData } = await supabase.from("order_items").select("*").in("order_id", orderIds);
+      // Fetch items in chunks to avoid Supabase's default 1000-row limit
+      // (a single .in() query is capped at 1000 rows total, not per order).
+      const CHUNK = 100;
+      const allItems: OrderItemDB[] = [];
+      for (let i = 0; i < orderIds.length; i += CHUNK) {
+        const slice = orderIds.slice(i, i + CHUNK);
+        const { data: itemsData, error: itemsError } = await supabase
+          .from("order_items")
+          .select("*")
+          .in("order_id", slice)
+          .limit(10000);
+        if (itemsError) {
+          console.error("Error fetching order_items chunk:", itemsError);
+          continue;
+        }
+        if (itemsData) allItems.push(...(itemsData as OrderItemDB[]));
+      }
 
       const itemsByOrder = new Map<string, OrderItemDB[]>();
-      itemsData?.forEach((item) => {
+      allItems.forEach((item) => {
         const existing = itemsByOrder.get(item.order_id) || [];
-        itemsByOrder.set(item.order_id, [...existing, item as OrderItemDB]);
+        itemsByOrder.set(item.order_id, [...existing, item]);
       });
 
       const ordersWithItems = ordersData?.map((order) => ({
