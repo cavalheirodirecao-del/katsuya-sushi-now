@@ -321,8 +321,16 @@ const Checkout = () => {
 
   const handleWhatsAppClick = () => {
     toast.success("Abrindo WhatsApp...");
-    // mostra fallback após 3s caso o app não abra
-    setTimeout(() => setWhatsappFallback(true), 3000);
+    // mostra fallback após 4s caso o app não abra (Android antigo demora mais)
+    setTimeout(() => setWhatsappFallback(true), 4000);
+  };
+
+  const closeSuccess = () => {
+    try { sessionStorage.removeItem("katsuya:lastOrderSuccess"); } catch {}
+    setWhatsappMessage(null);
+    setWhatsappUrl("");
+    setOrderNumber("");
+    navigate("/");
   };
 
   const inputClass =
