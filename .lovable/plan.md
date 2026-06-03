@@ -1,123 +1,39 @@
-## Objetivo
+# Corrigir "tela preta" ao finalizar pedido
 
-Permitir que o operador registre, dentro do próprio sistema, pedidos que chegam por WhatsApp escrito, print ou ligação — para que **100% do faturamento** fique centralizado no painel.
+## Problema
+Após o cliente tocar em **Finalizar Pedido**, o `createOrder` (chamada de rede) pode demorar alguns segundos em Androids antigos / 3G. Nesse intervalo a tela pode parecer travada/preta porque:
 
-A experiência precisa ser parecida com o checkout do cliente (que a equipe já conhece), porém otimizada para uso interno e rápido: buscar cliente por nome, ver telefone, escolher endereço já cadastrado, montar carrinho e finalizar — tudo sem sair do admin.
+1. Não existe nenhum **overlay visível** cobrindo a página enquanto `submitting = true` — o botão só mostra um pequeno spinner que fica fora da viewport quando o teclado está aberto.
+2. Quando `clearCart()` roda, o componente re-renderiza e, em devices lentos, há um "flash" entre o estado antigo e o estado `whatsappMessage`, que aparece como tela escura.
+3. A tela de sucesso atual mora dentro do mesmo componente `Checkout`. Se o WebView reciclar o componente (volta do WhatsApp, pouca memória, back-gesture), o estado some e o cliente fica sem saber se deu certo.
 
----
+## Solução
 
-## Nova aba no Admin: "Lançar Pedido"
+### 1. Overlay full-screen enquanto envia (`src/pages/Checkout.tsx`)
+Adicionar um overlay fixo `z-[60]` exibido enquanto `submitting === true`:
 
-Adicionar nova aba no `Admin.tsx` (visível para `master`, `admin` e `operator`):
+- Fundo `bg-background/95` com `backdrop-blur`
+- Spinner grande + texto "Enviando seu pedido..."
+- Subtexto "Não feche o app, já estamos confirmando."
 
-- Ícone: `ClipboardEdit` (lucide)
-- Label: **"Lançar Pedido"**
-- Posição: logo após "Produtos"
+Isso garante feedback visual imediato — nunca mais "tela preta" durante o `await`.
 
-Componente novo: `src/components/ManualOrderForm.tsx`.
+### 2. Tela de sucesso como overlay fixo full-screen
+Hoje a tela de sucesso é renderizada inline. Vou transformá-la em um overlay fixo (`fixed inset-0 z-[55] overflow-y-auto bg-background`) que cobre toda a viewport assim que `whatsappMessage` é setado. Benefícios:
 
----
+- Não depende do scroll/posição do checkout
+- Não há "flash" entre estados — overlay aparece por cima
+- Garantia visual de que o pedido foi recebido (✅ verde grande no topo)
 
-## Fluxo da tela (uma única página, em seções)
+### 3. Persistência via `sessionStorage`
+Salvar `{ orderNumber, whatsappUrl, whatsappMessage }` em `sessionStorage` assim que o pedido é criado, e ler no `useEffect` inicial do `Checkout`. Assim, se o WebView reciclar a página quando o cliente volta do WhatsApp, a tela de sucesso reaparece automaticamente em vez de uma tela vazia.
 
-```text
-┌─────────────────────────────────────────┐
-│  1. CLIENTE                             │
-│  [🔍 Buscar por nome ou telefone...]    │
-│  ┌─ Resultados (lista) ──────────────┐  │
-│  │ João Silva  · (81) 9xxxx-xxxx  →  │  │
-│  │ Maria Souza · (81) 9xxxx-xxxx  →  │  │
-│  └───────────────────────────────────┘  │
-│  [+ Novo cliente] (abre nome+telefone)  │
-├─────────────────────────────────────────┤
-│  2. ENTREGA                             │
-│  ◉ Delivery   ○ Retirada                │
-│  Endereços do cliente: (radio cards)    │
-│   ◉ Casa - Rua X, 123 - Boa Viagem      │
-│   ○ Trabalho - ...                      │
-│  [+ Novo endereço]                      │
-│  Bairro (select nativo) → calcula taxa  │
-├─────────────────────────────────────────┤
-│  3. ITENS DO PEDIDO                     │
-│  [🔍 Buscar produto...]                 │
-│  Lista de produtos ativos (clique p/+)  │
-│  ┌─ Carrinho ────────────────────────┐  │
-│  │ 2x Combo Sushi 20pç  R$ 80,00  ✕ │  │
-│  │ 1x Refri Lata        R$  6,00  ✕ │  │
-│  └───────────────────────────────────┘  │
-│  Obs do pedido: [textarea]              │
-├─────────────────────────────────────────┤
-│  4. PAGAMENTO                           │
-│  ○ PIX  ○ Dinheiro  ○ Cartão (+6%)      │
-│  Troco para: [____] (se dinheiro)       │
-├─────────────────────────────────────────┤
-│  RESUMO                                 │
-│  Subtotal:     R$ 86,00                 │
-│  Entrega:      R$  8,00                 │
-│  Taxa cartão:  R$  -                    │
-│  TOTAL:        R$ 94,00                 │
-│                                         │
-│  [ LANÇAR PEDIDO ]                      │
-└─────────────────────────────────────────┘
-```
+### 4. Pequenos ajustes de UX
+- Aumentar o delay do `setWhatsappFallback` de 3s para 4s (Android antigo demora mais a abrir o app).
+- Adicionar segundo botão "Já enviei pelo WhatsApp → Voltar ao cardápio" para o cliente confirmar e sair limpo.
+- Mostrar `Nº do pedido` em destaque (fonte grande) na confirmação — reforça que deu certo.
 
----
+## Arquivos alterados
+- `src/pages/Checkout.tsx` — overlay de envio, overlay de sucesso, sessionStorage, ajustes de UX
 
-## Detalhes de comportamento
-
-### 1. Busca de cliente
-- Campo único que aceita **nome** ou **telefone**.
-- Por nome: busca server-side via nova RPC `search_customers(p_query text)` retornando até 20 resultados (id, nome, telefone) com `ILIKE '%query%'`. Limita acesso ao role staff (security definer).
-- Por telefone (≥4 dígitos): também busca por `phone ILIKE`.
-- Cada resultado mostra **nome em destaque + telefone formatado**. Clique seleciona e carrega endereços via `lookup_customer_by_phone`.
-- Botão "Novo cliente" abre mini-form (nome + telefone) e usa `upsert_customer`.
-
-### 2. Endereços
-- Reaproveita lista de endereços do cliente selecionado.
-- Botão "Novo endereço" salva via `customer_addresses` (mesmo fluxo do checkout).
-- Em "Retirada", oculta seção de endereço/bairro e zera taxa.
-
-### 3. Itens
-- Carrega produtos ativos via `useProductsDB`.
-- Busca local por nome/categoria.
-- Clique adiciona ao carrinho local (estado do formulário, NÃO usa `CartContext` para não conflitar com sessão do cliente público).
-- Quantidade ajustável (+ / −), remoção, observação por item opcional.
-
-### 4. Pagamento e total
-- Mesma lógica do checkout: cartão soma 6% sobre (subtotal + entrega).
-- Resumo sempre visível (sticky no rodapé em mobile).
-
-### 5. Lançar pedido
-- Usa `createOrder` (mesmo `create_order_public` já existente) — pedido entra como `pendente` no Kanban como qualquer outro.
-- Marca operador no `audit_logs` (`action: "manual_order_created"`, `entity_id: order_id`, `description: "Pedido lançado manualmente por <email>"`).
-- **Não dispara WhatsApp** — pedido já veio de fora. Apenas toast de sucesso + opção "Lançar outro pedido" (limpa form) ou "Ver no painel" (vai pro Dashboard/Kanban).
-- Fora do horário/Alta Demanda: operador **pode** lançar normalmente (StoreGate não se aplica internamente) — apenas mostra um aviso amarelo "Loja fechada — confirme com o cliente".
-
----
-
-## Arquivos / mudanças
-
-| Arquivo | Ação |
-|---|---|
-| `src/components/ManualOrderForm.tsx` | **Novo** — formulário completo |
-| `src/pages/Admin.tsx` | Adicionar tab "Lançar Pedido" (visível p/ master, admin, operator) |
-| `src/hooks/useCustomers.ts` | Adicionar `searchCustomers(query)` chamando nova RPC |
-| `src/hooks/useAuth.ts` | Expor `canCreateManualOrder` (master/admin/operator) |
-| **Migration SQL** | Criar RPC `search_customers(p_query text)` SECURITY DEFINER, restrita a staff via `has_role` |
-| `audit_logs` | Inserção via cliente após criar pedido manual |
-
----
-
-## Pontos técnicos
-
-- **RPC `search_customers`**: dentro da função, validar `has_role(auth.uid(),'admin') OR 'master' OR 'operator' OR 'support'`; senão `RAISE EXCEPTION`.
-- **Sem `CartContext`**: o form mantém estado local para não interferir com carrinho do cliente público que possa estar aberto em outra aba.
-- **Mobile-first**: selects nativos (alinhado à memória `estabilidade-mobile`), inputs grandes — operadores usam celular.
-- **Reuso visual**: aproveitar classes/estilo do `Checkout.tsx` para consistência.
-
----
-
-## Fora do escopo (pode vir depois)
-- Edição de pedidos já lançados.
-- Importar/parsear print do WhatsApp automaticamente.
-- Histórico de pedidos por cliente dentro deste form (já existe no Dashboard).
+Sem mudanças no backend, no `useOrdersDB` ou no fluxo de criação do pedido. A lógica de criação já está correta — o pedido chega no painel; o que falta é apenas garantir que o cliente **veja** a confirmação em qualquer dispositivo.
