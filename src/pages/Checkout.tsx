@@ -299,11 +299,22 @@ const Checkout = () => {
 
     const encoded = encodeURIComponent(message);
     const whatsappPhone = (settings.phone || "").replace(/\D/g, "");
-    setWhatsappUrl(`https://wa.me/${whatsappPhone}?text=${encoded}`);
+    const url = `https://wa.me/${whatsappPhone}?text=${encoded}`;
+    setWhatsappUrl(url);
     setWhatsappMessage(message);
+    setOrderNumber(order.order_number);
+    // Persiste para sobreviver a recycling do WebView (Android antigo)
+    try {
+      sessionStorage.setItem(
+        "katsuya:lastOrderSuccess",
+        JSON.stringify({ whatsappMessage: message, whatsappUrl: url, orderNumber: order.order_number }),
+      );
+    } catch {}
     // Limpa carrinho assim que o pedido foi criado com sucesso
     clearCart();
     setSubmitting(false);
+    // Garante que o overlay aparece no topo da viewport
+    try { window.scrollTo({ top: 0, behavior: "auto" }); } catch {}
   };
 
   const [whatsappFallback, setWhatsappFallback] = useState(false);
