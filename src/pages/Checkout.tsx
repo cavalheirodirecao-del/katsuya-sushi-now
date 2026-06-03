@@ -56,6 +56,22 @@ const Checkout = () => {
   const [submitting, setSubmitting] = useState(false);
   const [whatsappMessage, setWhatsappMessage] = useState<string | null>(null);
   const [whatsappUrl, setWhatsappUrl] = useState<string>("");
+  const [orderNumber, setOrderNumber] = useState<string>("");
+
+  // Restaura tela de sucesso se WebView reciclou (Android antigo / voltou do WhatsApp)
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("katsuya:lastOrderSuccess");
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data?.whatsappMessage && data?.whatsappUrl) {
+          setWhatsappMessage(data.whatsappMessage);
+          setWhatsappUrl(data.whatsappUrl);
+          setOrderNumber(data.orderNumber || "");
+        }
+      }
+    } catch {}
+  }, []);
 
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
