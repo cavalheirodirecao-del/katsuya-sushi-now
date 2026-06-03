@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useCart } from "@/contexts/CartContext";
 import { useNavigate } from "react-router-dom";
 import { useNeighborhoodsDB } from "@/hooks/useNeighborhoodsDB";
@@ -56,6 +56,22 @@ const Checkout = () => {
   const [submitting, setSubmitting] = useState(false);
   const [whatsappMessage, setWhatsappMessage] = useState<string | null>(null);
   const [whatsappUrl, setWhatsappUrl] = useState<string>("");
+  const [orderNumber, setOrderNumber] = useState<string>("");
+
+  // Restaura tela de sucesso se WebView reciclou (Android antigo / voltou do WhatsApp)
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("katsuya:lastOrderSuccess");
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data?.whatsappMessage && data?.whatsappUrl) {
+          setWhatsappMessage(data.whatsappMessage);
+          setWhatsappUrl(data.whatsappUrl);
+          setOrderNumber(data.orderNumber || "");
+        }
+      }
+    } catch {}
+  }, []);
 
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -283,19 +299,38 @@ const Checkout = () => {
 
     const encoded = encodeURIComponent(message);
     const whatsappPhone = (settings.phone || "").replace(/\D/g, "");
-    setWhatsappUrl(`https://wa.me/${whatsappPhone}?text=${encoded}`);
+    const url = `https://wa.me/${whatsappPhone}?text=${encoded}`;
+    setWhatsappUrl(url);
     setWhatsappMessage(message);
+    setOrderNumber(order.order_number);
+    // Persiste para sobreviver a recycling do WebView (Android antigo)
+    try {
+      sessionStorage.setItem(
+        "katsuya:lastOrderSuccess",
+        JSON.stringify({ whatsappMessage: message, whatsappUrl: url, orderNumber: order.order_number }),
+      );
+    } catch {}
     // Limpa carrinho assim que o pedido foi criado com sucesso
     clearCart();
     setSubmitting(false);
+    // Garante que o overlay aparece no topo da viewport
+    try { window.scrollTo({ top: 0, behavior: "auto" }); } catch {}
   };
 
   const [whatsappFallback, setWhatsappFallback] = useState(false);
 
   const handleWhatsAppClick = () => {
     toast.success("Abrindo WhatsApp...");
-    // mostra fallback após 3s caso o app não abra
-    setTimeout(() => setWhatsappFallback(true), 3000);
+    // mostra fallback após 4s caso o app não abra (Android antigo demora mais)
+    setTimeout(() => setWhatsappFallback(true), 4000);
+  };
+
+  const closeSuccess = () => {
+    try { sessionStorage.removeItem("katsuya:lastOrderSuccess"); } catch {}
+    setWhatsappMessage(null);
+    setWhatsappUrl("");
+    setOrderNumber("");
+    navigate("/");
   };
 
   const inputClass =
@@ -304,46 +339,58 @@ const Checkout = () => {
   return (
     <div className="min-h-screen bg-background pb-10">
       <Header />
-      <div className="container py-4 space-y-6">
-        <AlertDialog open={!!deleteAddrId} onOpenChange={(open) => !open && setDeleteAddrId(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Remover endereço?</AlertDialogTitle>
-              <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleConfirmDeleteAddress}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Remover
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
 
-        {whatsappMessage ? (
-          <div className="space-y-4 animate-fade-in">
+      {/* Overlay enquanto envia — garante feedback visual em Android antigo */}
+      {submitting && (
+        <div className="fixed inset-0 z-[70] bg-background/95 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="text-center space-y-4 max-w-xs">
+            <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto" />
+            <p className="text-lg font-bold text-foreground">Enviando seu pedido...</p>
+            <p className="text-sm text-muted-foreground">Não feche o app, já estamos confirmando.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Overlay de SUCESSO — fixed para cobrir toda a viewport, sem "tela preta" */}
+      {whatsappMessage && (
+        <div className="fixed inset-0 z-[60] bg-background overflow-y-auto">
+          <div className="container max-w-2xl mx-auto py-6 px-4 space-y-4 animate-fade-in">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => navigate("/")}
+                onClick={closeSuccess}
                 className="p-2 rounded-lg bg-secondary text-secondary-foreground hover:bg-accent transition-colors"
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
-              <h1 className="font-display text-xl font-bold text-foreground">Pedido recebido! ✅</h1>
+              <h1 className="font-display text-xl font-bold text-foreground">Pedido recebido!</h1>
             </div>
 
-            {/* Confirmação clara */}
-            <div className="bg-green-500/10 border border-green-500/40 rounded-xl p-4 space-y-1">
-              <p className="text-sm font-bold text-foreground">
-                ✅ Seu pedido já foi registrado no sistema do restaurante.
+            {/* Confirmação grande e clara */}
+            <div className="bg-green-500/10 border-2 border-green-500/50 rounded-xl p-6 text-center space-y-2">
+              <div className="h-16 w-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto">
+                <Check className="h-10 w-10 text-green-500" strokeWidth={3} />
+              </div>
+              <p className="text-base font-bold text-foreground">
+                Seu pedido foi registrado!
               </p>
+              {orderNumber && (
+                <p className="text-2xl font-black text-primary">Nº {orderNumber}</p>
+              )}
               <p className="text-xs text-muted-foreground">
                 Agora envie a mensagem no WhatsApp para confirmarmos com você.
               </p>
             </div>
+
+            {/* Botão principal — WhatsApp */}
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={handleWhatsAppClick}
+              className="w-full gradient-red text-primary-foreground py-4 rounded-full font-bold text-base flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
+            >
+              <MessageCircle className="h-5 w-5" /> Abrir WhatsApp e Enviar
+            </a>
 
             <div className="bg-card border border-border rounded-xl p-4 space-y-3">
               <p className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -363,23 +410,6 @@ const Checkout = () => {
               </button>
             </div>
 
-            <div className="bg-primary/10 border border-primary/30 rounded-xl p-4">
-              <p className="text-sm text-primary font-medium">
-                📱 Toque no botão abaixo para abrir o WhatsApp com a mensagem já preenchida.
-              </p>
-            </div>
-
-            {/* Link nativo — mais estável no Android que window.location.href */}
-            <a
-              href={whatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={handleWhatsAppClick}
-              className="w-full gradient-red text-primary-foreground py-4 rounded-full font-bold text-base flex items-center justify-center gap-2 hover:opacity-90 transition-opacity active:scale-95"
-            >
-              <ExternalLink className="h-5 w-5" /> Abrir WhatsApp e Enviar
-            </a>
-
             {whatsappFallback && (
               <div className="space-y-2 animate-fade-in">
                 <p className="text-sm text-muted-foreground text-center">
@@ -391,19 +421,41 @@ const Checkout = () => {
                   rel="noopener noreferrer"
                   className="w-full block bg-secondary text-foreground py-3 rounded-full font-bold text-center text-sm hover:bg-accent transition-colors"
                 >
-                  Tentar novamente
+                  <ExternalLink className="h-4 w-4 inline mr-1" /> Tentar abrir novamente
                 </a>
               </div>
             )}
 
             <button
-              onClick={() => navigate("/")}
+              onClick={closeSuccess}
               className="w-full bg-secondary text-secondary-foreground py-3 rounded-full text-sm hover:bg-accent transition-colors"
             >
-              Voltar ao início
+              Já enviei — Voltar ao cardápio
             </button>
           </div>
-        ) : (
+        </div>
+      )}
+
+      <div className="container py-4 space-y-6">
+        <AlertDialog open={!!deleteAddrId} onOpenChange={(open) => !open && setDeleteAddrId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remover endereço?</AlertDialogTitle>
+              <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleConfirmDeleteAddress}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Remover
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <>
           <>
             <h1 className="font-display text-xl font-bold text-foreground">Finalizar Pedido</h1>
 
@@ -760,7 +812,7 @@ const Checkout = () => {
               </>
             )}
           </>
-        )}
+        </>
       </div>
     </div>
   );
