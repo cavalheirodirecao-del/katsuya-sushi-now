@@ -50,12 +50,42 @@ const Index = () => {
           <div className="bg-card rounded-xl border border-border p-5 space-y-4">
             <div className="flex items-start gap-3">
               <Clock className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-              <div>
-                <h3 className="font-bold text-foreground text-sm">Horário de Funcionamento</h3>
-                <p className="text-muted-foreground text-sm mt-1">Quarta a Domingo</p>
-                <p className="text-muted-foreground text-sm">12:00 – 14:00 | 17:00 – 22:00</p>
+              <div className="flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-bold text-foreground text-sm">Horário de Funcionamento</h3>
+                  <span
+                    className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      isOpen
+                        ? "bg-primary/15 text-primary"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {isHighDemand ? "Alta demanda" : isOpen ? "Aberto agora" : "Fechado agora"}
+                  </span>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {hasHours ? (
+                    DAY_KEYS.map((key) => {
+                      const day = bh[key];
+                      const open = day?.active && (day.slots?.length ?? 0) > 0;
+                      return (
+                        <div key={key} className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">{SHORT_LABELS[key] || DAY_LABELS[key]}</span>
+                          <span className={open ? "text-foreground" : "text-muted-foreground/70"}>
+                            {open
+                              ? day.slots.map((s) => `${s.start} – ${s.end}`).join(" | ")
+                              : "Fechado"}
+                          </span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-muted-foreground text-sm">Horários não informados</p>
+                  )}
+                </div>
               </div>
             </div>
+
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 text-primary mt-0.5 shrink-0" />
               <div>
