@@ -3,10 +3,26 @@ import { MapPin, Clock, Instagram, MessageCircle } from "lucide-react";
 import heroImg from "@/assets/hero-sushi.jpg";
 import logo from "@/assets/logo.png";
 import StoreGate from "@/components/StoreGate";
+import { useCompanySettings, DAY_KEYS, DAY_LABELS } from "@/hooks/useCompanySettings";
+
+const SHORT_LABELS: Record<string, string> = {
+  seg: "Segunda",
+  ter: "Terça",
+  qua: "Quarta",
+  qui: "Quinta",
+  sex: "Sexta",
+  sab: "Sábado",
+  dom: "Domingo",
+};
 
 const Index = () => {
+  const { settings, isOpen, isHighDemand } = useCompanySettings();
+  const bh = settings.business_hours || {};
+  const hasHours = Object.keys(bh).length > 0;
+
   return (
     <StoreGate overlay>
+
       <div className="min-h-screen bg-background">
         {/* Hero */}
         <section className="relative h-[85vh] flex items-end">
