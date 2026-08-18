@@ -161,8 +161,9 @@ export const useCompanySettings = () => {
 
   // Realtime: qualquer alteração no painel reflete imediatamente nos clientes
   useEffect(() => {
+    // nome único por instância do hook (evita reuso de canal já inscrito)
     const channel = supabase
-      .channel("company-settings-changes")
+      .channel(`company-settings-${Math.random().toString(36).slice(2)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "company_settings" },
@@ -173,6 +174,7 @@ export const useCompanySettings = () => {
       supabase.removeChannel(channel);
     };
   }, [fetchSettings]);
+
 
   const isHighDemand = useMemo(() => {
     return settings.high_demand_active && isToday(settings.high_demand_activated_at);
