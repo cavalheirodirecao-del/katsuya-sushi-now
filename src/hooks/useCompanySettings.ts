@@ -72,22 +72,37 @@ const DEFAULT_SETTINGS: CompanySettings = {
 const DEFAULT_HIGH_DEMAND_MSG =
   "Por hoje encerramos os pedidos devido à alta demanda. Por favor, volte amanhã.";
 
-function isToday(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
+// Horário oficial da loja (fuso do restaurante), independente do fuso do aparelho
+const STORE_TZ = "America/Sao_Paulo";
+
+function storeNow(): { dayIndex: number; hhmm: string } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: STORE_TZ,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const get = (t: string) => parts.find((p) => p.type === t)?.value || "";
+  const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return { dayIndex: map[get("weekday")] ?? new Date().getDay(), hhmm: `${hour}:${get("minute")}` };
 }
 
-function timeInSlot(slot: TimeSlot): boolean {
-  const now = new Date();
-  const hhmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+function isToday(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  const fmt = (d: Date) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: STORE_TZ }).format(d);
+  return fmt(new Date(dateStr)) === fmt(new Date());
+}
+
+function timeInSlot(slot: TimeSlot, hhmm: string): boolean {
+  if (!slot?.start || !slot?.end) return false;
+  // Turno que vira a madrugada (ex.: 18:00 → 02:00)
+  if (slot.end <= slot.start) return hhmm >= slot.start || hhmm < slot.end;
   return hhmm >= slot.start && hhmm < slot.end;
 }
+
 
 export const useCompanySettings = () => {
   const [settings, setSettings] = useState<CompanySettings>(DEFAULT_SETTINGS);
@@ -121,13 +136,47 @@ export const useCompanySettings = () => {
     setLoading(false);
   }, []);
 
+  // Re-avalia o status a cada 30s (e ao voltar para o app)
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 30000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        setTick((t) => t + 1);
+        fetchSettings();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [fetchSettings]);
+
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
 
+  // Realtime: qualquer alteração no painel reflete imediatamente nos clientes
+  useEffect(() => {
+    const channel = supabase
+      .channel("company-settings-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "company_settings" },
+        () => fetchSettings()
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchSettings]);
+
   const isHighDemand = useMemo(() => {
     return settings.high_demand_active && isToday(settings.high_demand_activated_at);
-  }, [settings.high_demand_active, settings.high_demand_activated_at]);
+  }, [settings.high_demand_active, settings.high_demand_activated_at, tick]);
 
   const highDemandMessage = useMemo(() => {
     return settings.high_demand_message || DEFAULT_HIGH_DEMAND_MSG;
@@ -135,12 +184,23 @@ export const useCompanySettings = () => {
 
   const isWithinBusinessHours = useMemo(() => {
     const bh = settings.business_hours;
-    if (!bh || Object.keys(bh).length === 0) return true; // no hours configured = always open
-    const todayKey = JS_DAY_TO_KEY[new Date().getDay()];
+    if (!bh || Object.keys(bh).length === 0) return true; // sem horários = sempre aberto
+    const { dayIndex, hhmm } = storeNow();
+    const todayKey = JS_DAY_TO_KEY[dayIndex];
     const day = bh[todayKey];
-    if (!day || !day.active) return false;
-    return day.slots.some(timeInSlot);
-  }, [settings.business_hours]);
+    if (day?.active && (day.slots || []).some((s) => timeInSlot(s, hhmm))) return true;
+
+    // Turno da véspera que atravessa a madrugada (ex.: sáb 18:00 → 02:00)
+    const prevKey = JS_DAY_TO_KEY[(dayIndex + 6) % 7];
+    const prev = bh[prevKey];
+    if (prev?.active) {
+      return (prev.slots || []).some(
+        (s) => s.start && s.end && s.end <= s.start && hhmm < s.end
+      );
+    }
+    return false;
+  }, [settings.business_hours, tick]);
+
 
   const isOpen = useMemo(() => {
     if (isHighDemand) return false;
